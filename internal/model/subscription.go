@@ -8,6 +8,6 @@ type Subscription struct {
 }
 
 type SubscribeRequest struct {
-	Email string `json:"email"`
-	Repo  string `json:"repo"`
+	Email string `json:"email" validate:"required,email"`
+	Repo  string `json:"repo" validate:"required,github_repo"`
 }
