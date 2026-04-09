@@ -1,13 +1,13 @@
 package model
 
 type Subscription struct {
-	email       string
-	repo        string
-	confirmed   bool
-	lastSeenTag string
+	Email       string `json:"email"`
+	Repo        string `json:"repo"`
+	Confirmed   bool   `json:"confirmed"`
+	LastSeenTag string `json:"last_seen_tag"`
 }
 
 type SubscribeRequest struct {
-	email string
-	repo  string
+	Email string `json:"email"`
+	Repo  string `json:"repo"`
 }

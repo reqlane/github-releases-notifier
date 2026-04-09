@@ -1,6 +1,8 @@
 package service
 
 import (
+	"fmt"
+
 	"github.com/reqlane/github-releases-notifier/internal/api/repository"
 	"github.com/reqlane/github-releases-notifier/internal/model"
 )
@@ -26,5 +28,10 @@ func (s *SubscriptionService) Unsubscribe(token string) error {
 }
 
 func (s *SubscriptionService) GetSubscriptions(email string) ([]model.Subscription, error) {
-	return nil, nil
+	// TODO validate email
+	subscriptions, err := s.repo.GetByEmail(email)
+	if err != nil {
+		return nil, fmt.Errorf("service.GetSubscriptions: %w", err)
+	}
+	return subscriptions, nil
 }
