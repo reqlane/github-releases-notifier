@@ -14,4 +14,7 @@ func (a *app) subscriptionRouter(mux *http.ServeMux) {
 	subscriptionHandler := handler.NewSubcriptionHandler(subscriptionService)
 
 	mux.HandleFunc("POST /subscribe", subscriptionHandler.SubscribeHandler)
+	mux.HandleFunc("GET /confirm/{token}", subscriptionHandler.ConfirmHandler)
+	mux.HandleFunc("GET /unsubscribe/{token}", subscriptionHandler.UnsubscribeHandler)
+	mux.HandleFunc("GET /subscriptions", subscriptionHandler.GetSubscriptionsHandler)
 }

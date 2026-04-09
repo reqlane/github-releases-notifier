@@ -1,6 +1,9 @@
 package service
 
-import "github.com/reqlane/github-releases-notifier/internal/api/repository"
+import (
+	"github.com/reqlane/github-releases-notifier/internal/api/repository"
+	"github.com/reqlane/github-releases-notifier/internal/model"
+)
 
 type SubscriptionService struct {
 	repo *repository.SubscriptionRepository
@@ -8,4 +11,20 @@ type SubscriptionService struct {
 
 func NewSubcriptionService(repo *repository.SubscriptionRepository) *SubscriptionService {
 	return &SubscriptionService{repo: repo}
+}
+
+func (s *SubscriptionService) Subscribe(req *model.SubscribeRequest) (*model.Subscription, error) {
+	return nil, nil
+}
+
+func (s *SubscriptionService) Confirm(token string) (*model.Subscription, error) {
+	return nil, nil
+}
+
+func (s *SubscriptionService) Unsubscribe(token string) (*model.UnsubscribeResponseData, error) {
+	return nil, nil
+}
+
+func (s *SubscriptionService) GetSubscriptions(email string) ([]model.Subscription, error) {
+	return nil, nil
 }
