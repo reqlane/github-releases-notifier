@@ -13,16 +13,16 @@ func NewSubcriptionService(repo *repository.SubscriptionRepository) *Subscriptio
 	return &SubscriptionService{repo: repo}
 }
 
-func (s *SubscriptionService) Subscribe(req *model.SubscribeRequest) (*model.Subscription, error) {
-	return nil, nil
+func (s *SubscriptionService) Subscribe(req *model.SubscribeRequest) error {
+	return nil
 }
 
-func (s *SubscriptionService) Confirm(token string) (*model.Subscription, error) {
-	return nil, nil
+func (s *SubscriptionService) Confirm(token string) error {
+	return nil
 }
 
-func (s *SubscriptionService) Unsubscribe(token string) (*model.UnsubscribeResponseData, error) {
-	return nil, nil
+func (s *SubscriptionService) Unsubscribe(token string) error {
+	return nil
 }
 
 func (s *SubscriptionService) GetSubscriptions(email string) ([]model.Subscription, error) {

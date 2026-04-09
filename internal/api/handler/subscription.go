@@ -27,7 +27,7 @@ func (h *subscriptionHandler) SubscribeHandler(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	subscription, err := h.service.Subscribe(&subscribeRequest)
+	err = h.service.Subscribe(&subscribeRequest)
 	if err != nil {
 		// TODO handling
 		http.Error(w, "500", http.StatusInternalServerError)
@@ -35,14 +35,9 @@ func (h *subscriptionHandler) SubscribeHandler(w http.ResponseWriter, r *http.Re
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	response := struct {
-		Status  string             `json:"status"`
-		Message string             `json:"message"`
-		Data    model.Subscription `json:"data"`
-	}{
+	response := Response{
 		Status:  "success",
 		Message: "Subscription successful. Confirmation email sent.",
-		Data:    *subscription,
 	}
 	json.NewEncoder(w).Encode(response)
 }
@@ -50,7 +45,7 @@ func (h *subscriptionHandler) SubscribeHandler(w http.ResponseWriter, r *http.Re
 func (h *subscriptionHandler) ConfirmHandler(w http.ResponseWriter, r *http.Request) {
 	token := r.PathValue("token")
 
-	subscription, err := h.service.Confirm(token)
+	err := h.service.Confirm(token)
 	if err != nil {
 		// TODO handling
 		http.Error(w, "500", http.StatusInternalServerError)
@@ -58,14 +53,9 @@ func (h *subscriptionHandler) ConfirmHandler(w http.ResponseWriter, r *http.Requ
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	response := struct {
-		Status  string             `json:"status"`
-		Message string             `json:"message"`
-		Data    model.Subscription `json:"data"`
-	}{
+	response := Response{
 		Status:  "success",
 		Message: "Subscription confirmed successfully",
-		Data:    *subscription,
 	}
 	json.NewEncoder(w).Encode(response)
 }
@@ -73,7 +63,7 @@ func (h *subscriptionHandler) ConfirmHandler(w http.ResponseWriter, r *http.Requ
 func (h *subscriptionHandler) UnsubscribeHandler(w http.ResponseWriter, r *http.Request) {
 	token := r.PathValue("token")
 
-	unsubscribedData, err := h.service.Unsubscribe(token)
+	err := h.service.Unsubscribe(token)
 	if err != nil {
 		// TODO handling
 		http.Error(w, "500", http.StatusInternalServerError)
@@ -81,14 +71,9 @@ func (h *subscriptionHandler) UnsubscribeHandler(w http.ResponseWriter, r *http.
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	response := struct {
-		Status  string                        `json:"status"`
-		Message string                        `json:"message"`
-		Data    model.UnsubscribeResponseData `json:"data"`
-	}{
+	response := Response{
 		Status:  "success",
 		Message: "Unsubscribed successfully",
-		Data:    *unsubscribedData,
 	}
 	json.NewEncoder(w).Encode(response)
 }
@@ -104,14 +89,5 @@ func (h *subscriptionHandler) GetSubscriptionsHandler(w http.ResponseWriter, r *
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	response := struct {
-		Status  string               `json:"status"`
-		Message string               `json:"message"`
-		Data    []model.Subscription `json:"data"`
-	}{
-		Status:  "success",
-		Message: "Unsubscribed successfully",
-		Data:    subscriptions,
-	}
-	json.NewEncoder(w).Encode(response)
+	json.NewEncoder(w).Encode(subscriptions)
 }
