@@ -12,20 +12,25 @@ import (
 )
 
 func main() {
-	err := godotenv.Load("../../.env")
+	err := godotenv.Load(".env")
 	if err != nil {
 		log.Fatalln("Error loading .env file:", err)
 	}
 
-	db, err := db.ConnectDB()
+	dbConn, err := db.ConnectDB()
 	if err != nil {
 		log.Fatalln("Error connecting to db:", err)
 	}
-	defer db.Close()
+	defer dbConn.Close()
+
+	err = db.RunMigrations(dbConn)
+	if err != nil {
+		log.Fatalln("Error running migratrions:", err)
+	}
 
 	port := os.Getenv("SERVER_PORT")
 
-	app := router.NewApp(db)
+	app := router.NewApp(dbConn)
 	mux := app.Router()
 
 	server := http.Server{
