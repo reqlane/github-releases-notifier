@@ -7,19 +7,26 @@ import (
 	"os"
 
 	"github.com/joho/godotenv"
+	"github.com/reqlane/github-releases-notifier/internal/api/router"
+	"github.com/reqlane/github-releases-notifier/internal/db"
 )
 
 func main() {
 	err := godotenv.Load("../../.env")
 	if err != nil {
-		log.Println("main:", err)
-		return
+		log.Fatalln("Error loading .env file:", err)
 	}
+
+	db, err := db.ConnectDB()
+	if err != nil {
+		log.Fatalln("Error connecting to db:", err)
+	}
+	defer db.Close()
 
 	port := os.Getenv("SERVER_PORT")
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, "placeholder") })
+	app := router.NewApp(db)
+	mux := app.Router()
 
 	server := http.Server{
 		Addr:    ":" + port,

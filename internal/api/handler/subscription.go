@@ -1,6 +1,10 @@
 package handler
 
-import "github.com/reqlane/github-releases-notifier/internal/api/service"
+import (
+	"net/http"
+
+	"github.com/reqlane/github-releases-notifier/internal/api/service"
+)
 
 type subscriptionHandler struct {
 	service *service.SubscriptionService
@@ -8,4 +12,8 @@ type subscriptionHandler struct {
 
 func NewSubcriptionHandler(service *service.SubscriptionService) *subscriptionHandler {
 	return &subscriptionHandler{service: service}
+}
+
+func (h *subscriptionHandler) SubscribeHandler(w http.ResponseWriter, r *http.Request) {
+
 }
