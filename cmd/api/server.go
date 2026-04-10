@@ -8,7 +8,10 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+	"github.com/reqlane/github-releases-notifier/internal/api/handler"
+	"github.com/reqlane/github-releases-notifier/internal/api/repository"
 	"github.com/reqlane/github-releases-notifier/internal/api/router"
+	"github.com/reqlane/github-releases-notifier/internal/api/service"
 	"github.com/reqlane/github-releases-notifier/internal/db"
 	"github.com/reqlane/github-releases-notifier/internal/githubapi"
 )
@@ -35,7 +38,12 @@ func main() {
 
 	client := http.Client{Timeout: 10 * time.Second}
 	githubClient := githubapi.NewGithubClient(&client, githubApiToken)
-	app := router.NewApp(dbConn, githubClient)
+
+	subscriptionRepository := repository.NewSubcriptionRepository(dbConn)
+	subscriptionService := service.NewSubcriptionService(subscriptionRepository, githubClient)
+	subscriptionHandler := handler.NewSubcriptionHandler(subscriptionService)
+
+	app := router.NewApp(subscriptionHandler)
 	mux := app.Router()
 
 	server := http.Server{

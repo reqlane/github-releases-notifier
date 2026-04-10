@@ -8,15 +8,15 @@ import (
 	"github.com/reqlane/github-releases-notifier/internal/model"
 )
 
-type subscriptionHandler struct {
+type SubscriptionHandler struct {
 	service *service.SubscriptionService
 }
 
-func NewSubcriptionHandler(service *service.SubscriptionService) *subscriptionHandler {
-	return &subscriptionHandler{service: service}
+func NewSubcriptionHandler(service *service.SubscriptionService) *SubscriptionHandler {
+	return &SubscriptionHandler{service: service}
 }
 
-func (h *subscriptionHandler) SubscribeHandler(w http.ResponseWriter, r *http.Request) {
+func (h *SubscriptionHandler) SubscribeHandler(w http.ResponseWriter, r *http.Request) {
 	var subscribeRequest model.SubscribeRequest
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
@@ -35,7 +35,7 @@ func (h *subscriptionHandler) SubscribeHandler(w http.ResponseWriter, r *http.Re
 	sendSuccess(w, "Subscription successful. Confirmation email sent.")
 }
 
-func (h *subscriptionHandler) ConfirmHandler(w http.ResponseWriter, r *http.Request) {
+func (h *SubscriptionHandler) ConfirmHandler(w http.ResponseWriter, r *http.Request) {
 	token := r.PathValue("token")
 
 	err := h.service.Confirm(token)
@@ -47,7 +47,7 @@ func (h *subscriptionHandler) ConfirmHandler(w http.ResponseWriter, r *http.Requ
 	sendSuccess(w, "Subscription confirmed successfully")
 }
 
-func (h *subscriptionHandler) UnsubscribeHandler(w http.ResponseWriter, r *http.Request) {
+func (h *SubscriptionHandler) UnsubscribeHandler(w http.ResponseWriter, r *http.Request) {
 	token := r.PathValue("token")
 
 	err := h.service.Unsubscribe(token)
@@ -59,7 +59,7 @@ func (h *subscriptionHandler) UnsubscribeHandler(w http.ResponseWriter, r *http.
 	sendSuccess(w, "Unsubscribed successfully")
 }
 
-func (h *subscriptionHandler) GetSubscriptionsHandler(w http.ResponseWriter, r *http.Request) {
+func (h *SubscriptionHandler) GetSubscriptionsHandler(w http.ResponseWriter, r *http.Request) {
 	filter := &model.SubscriptionFilter{Email: r.URL.Query().Get("email")}
 
 	subscriptions, err := h.service.GetSubscriptions(filter)

@@ -1,21 +1,18 @@
 package router
 
 import (
-	"database/sql"
 	"net/http"
 
-	"github.com/reqlane/github-releases-notifier/internal/githubapi"
+	"github.com/reqlane/github-releases-notifier/internal/api/handler"
 )
 
 type app struct {
-	db           *sql.DB
-	githubClient *githubapi.GithubClient
+	subscriptionHandler *handler.SubscriptionHandler
 }
 
-func NewApp(db *sql.DB, githubClient *githubapi.GithubClient) *app {
+func NewApp(subscriptionHandler *handler.SubscriptionHandler) *app {
 	return &app{
-		db:           db,
-		githubClient: githubClient,
+		subscriptionHandler: subscriptionHandler,
 	}
 }
 
