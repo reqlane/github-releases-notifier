@@ -4,15 +4,20 @@ import (
 	"fmt"
 
 	"github.com/reqlane/github-releases-notifier/internal/api/repository"
+	"github.com/reqlane/github-releases-notifier/internal/githubapi"
 	"github.com/reqlane/github-releases-notifier/internal/model"
 )
 
 type SubscriptionService struct {
-	repo *repository.SubscriptionRepository
+	repo         *repository.SubscriptionRepository
+	githubClient *githubapi.GithubClient
 }
 
-func NewSubcriptionService(repo *repository.SubscriptionRepository) *SubscriptionService {
-	return &SubscriptionService{repo: repo}
+func NewSubcriptionService(repo *repository.SubscriptionRepository, githubClient *githubapi.GithubClient) *SubscriptionService {
+	return &SubscriptionService{
+		repo:         repo,
+		githubClient: githubClient,
+	}
 }
 
 func (s *SubscriptionService) Subscribe(req *model.SubscribeRequest) error {

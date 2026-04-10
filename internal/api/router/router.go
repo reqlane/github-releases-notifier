@@ -3,14 +3,20 @@ package router
 import (
 	"database/sql"
 	"net/http"
+
+	"github.com/reqlane/github-releases-notifier/internal/githubapi"
 )
 
 type app struct {
-	db *sql.DB
+	db           *sql.DB
+	githubClient *githubapi.GithubClient
 }
 
-func NewApp(db *sql.DB) *app {
-	return &app{db: db}
+func NewApp(db *sql.DB, githubClient *githubapi.GithubClient) *app {
+	return &app{
+		db:           db,
+		githubClient: githubClient,
+	}
 }
 
 func (a *app) Router() *http.ServeMux {

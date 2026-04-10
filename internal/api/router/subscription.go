@@ -10,7 +10,7 @@ import (
 
 func (a *app) subscriptionRouter(mux *http.ServeMux) {
 	subscriptionRepository := repository.NewSubcriptionRepository(a.db)
-	subscriptionService := service.NewSubcriptionService(subscriptionRepository)
+	subscriptionService := service.NewSubcriptionService(subscriptionRepository, a.githubClient)
 	subscriptionHandler := handler.NewSubcriptionHandler(subscriptionService)
 
 	mux.HandleFunc("POST /subscribe", subscriptionHandler.SubscribeHandler)

@@ -5,10 +5,12 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/reqlane/github-releases-notifier/internal/api/router"
 	"github.com/reqlane/github-releases-notifier/internal/db"
+	"github.com/reqlane/github-releases-notifier/internal/githubapi"
 )
 
 func main() {
@@ -29,8 +31,11 @@ func main() {
 	}
 
 	port := os.Getenv("SERVER_PORT")
+	githubApiToken := os.Getenv("GITHUB_API_TOKEN")
 
-	app := router.NewApp(dbConn)
+	client := http.Client{Timeout: 10 * time.Second}
+	githubClient := githubapi.NewGithubClient(&client, githubApiToken)
+	app := router.NewApp(dbConn, githubClient)
 	mux := app.Router()
 
 	server := http.Server{
