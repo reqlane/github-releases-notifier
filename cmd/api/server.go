@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -12,6 +11,7 @@ import (
 	"github.com/reqlane/github-releases-notifier/internal/api/repository"
 	"github.com/reqlane/github-releases-notifier/internal/api/router"
 	"github.com/reqlane/github-releases-notifier/internal/api/service"
+	"github.com/reqlane/github-releases-notifier/internal/config"
 	"github.com/reqlane/github-releases-notifier/internal/db"
 	"github.com/reqlane/github-releases-notifier/internal/githubapi"
 )
@@ -22,7 +22,12 @@ func main() {
 		log.Fatalln("Error loading .env file:", err)
 	}
 
-	dbConn, err := db.ConnectDB()
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalln("Error loading config:", err)
+	}
+
+	dbConn, err := db.ConnectDB(cfg.DSN())
 	if err != nil {
 		log.Fatalln("Error connecting to db:", err)
 	}
@@ -33,8 +38,8 @@ func main() {
 		log.Fatalln("Error running migratrions:", err)
 	}
 
-	port := os.Getenv("SERVER_PORT")
-	githubApiToken := os.Getenv("GITHUB_API_TOKEN")
+	port := cfg.ServerPort
+	githubApiToken := cfg.GithubToken
 
 	client := http.Client{Timeout: 10 * time.Second}
 	githubClient := githubapi.NewGithubClient(&client, githubApiToken)
