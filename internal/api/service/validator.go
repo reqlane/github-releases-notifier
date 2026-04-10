@@ -1,17 +1,17 @@
 package service
 
 import (
-	"fmt"
 	"reflect"
 	"regexp"
 	"strings"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/reqlane/github-releases-notifier/internal/apperror"
 )
 
 var (
 	validate        = validator.New(validator.WithRequiredStructEnabled())
-	githubRepoRegex = regexp.MustCompile(`(?i)^[a-z\d](([a-z\d-]?[a-z\d])*)?/[a-z\d_-][a-z\d_.-]*$`)
+	githubRepoRegex = regexp.MustCompile(`(?i)^[a-z\d](([a-z\d-]?[a-z\d])*)?/[a-z\d_.-][a-z\d_.-]*$`)
 )
 
 func init() {
@@ -33,19 +33,17 @@ func init() {
 	})
 }
 
-func handleValidationError(err error) error {
+func validationError(err error) error {
 	if ve, ok := err.(validator.ValidationErrors); ok {
-		fieldErr := ve[0]
-		switch ve[0].Tag() {
-		case "required":
-			return fmt.Errorf("%s is required", fieldErr.Field())
-		case "email":
-			return fmt.Errorf("%s is invalid email", fieldErr.Value())
-		case "github_repo":
-			return fmt.Errorf("%s is invalid repo, must be in owner/repo format", fieldErr.Value())
-		default:
-			return fmt.Errorf("invalid %s", fieldErr.Field())
+		errVal := &apperror.ErrValidation{}
+		for _, fe := range ve {
+			errVal.Errs = append(errVal.Errs, apperror.ErrField{
+				Field:      fe.Field(),
+				Value:      fe.Value(),
+				Constraint: fe.Tag(),
+			})
 		}
+		return errVal
 	}
 	return err
 }

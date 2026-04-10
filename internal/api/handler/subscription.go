@@ -22,24 +22,17 @@ func (h *subscriptionHandler) SubscribeHandler(w http.ResponseWriter, r *http.Re
 	decoder.DisallowUnknownFields()
 	err := decoder.Decode(&subscribeRequest)
 	if err != nil {
-		// TODO handling
-		http.Error(w, "400", http.StatusBadRequest)
+		sendError(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
 	err = h.service.Subscribe(&subscribeRequest)
 	if err != nil {
-		// TODO handling
-		http.Error(w, "500", http.StatusInternalServerError)
+		sendFromAppError(w, err)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	response := Response{
-		Status:  "success",
-		Message: "Subscription successful. Confirmation email sent.",
-	}
-	json.NewEncoder(w).Encode(response)
+	sendSuccess(w, "Subscription successful. Confirmation email sent.")
 }
 
 func (h *subscriptionHandler) ConfirmHandler(w http.ResponseWriter, r *http.Request) {
@@ -47,17 +40,11 @@ func (h *subscriptionHandler) ConfirmHandler(w http.ResponseWriter, r *http.Requ
 
 	err := h.service.Confirm(token)
 	if err != nil {
-		// TODO handling
-		http.Error(w, "500", http.StatusInternalServerError)
+		sendFromAppError(w, err)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	response := Response{
-		Status:  "success",
-		Message: "Subscription confirmed successfully",
-	}
-	json.NewEncoder(w).Encode(response)
+	sendSuccess(w, "Subscription confirmed successfully")
 }
 
 func (h *subscriptionHandler) UnsubscribeHandler(w http.ResponseWriter, r *http.Request) {
@@ -65,29 +52,21 @@ func (h *subscriptionHandler) UnsubscribeHandler(w http.ResponseWriter, r *http.
 
 	err := h.service.Unsubscribe(token)
 	if err != nil {
-		// TODO handling
-		http.Error(w, "500", http.StatusInternalServerError)
+		sendFromAppError(w, err)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	response := Response{
-		Status:  "success",
-		Message: "Unsubscribed successfully",
-	}
-	json.NewEncoder(w).Encode(response)
+	sendSuccess(w, "Unsubscribed successfully")
 }
 
 func (h *subscriptionHandler) GetSubscriptionsHandler(w http.ResponseWriter, r *http.Request) {
-	email := r.URL.Query().Get("email")
+	filter := &model.SubscriptionFilter{Email: r.URL.Query().Get("email")}
 
-	subscriptions, err := h.service.GetSubscriptions(email)
+	subscriptions, err := h.service.GetSubscriptions(filter)
 	if err != nil {
-		// TODO handling
-		http.Error(w, "500", http.StatusInternalServerError)
+		sendFromAppError(w, err)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(subscriptions)
+	sendJSON(w, http.StatusOK, subscriptions)
 }

@@ -17,7 +17,7 @@ func NewSubcriptionService(repo *repository.SubscriptionRepository) *Subscriptio
 
 func (s *SubscriptionService) Subscribe(req *model.SubscribeRequest) error {
 	if err := validate.Struct(req); err != nil {
-		return handleValidationError(err)
+		return validationError(err)
 	}
 	return nil
 }
@@ -30,12 +30,12 @@ func (s *SubscriptionService) Unsubscribe(token string) error {
 	return nil
 }
 
-func (s *SubscriptionService) GetSubscriptions(email string) ([]model.Subscription, error) {
-	if err := validate.Var(email, "required,email"); err != nil {
-		return nil, handleValidationError(err)
+func (s *SubscriptionService) GetSubscriptions(filter *model.SubscriptionFilter) ([]model.Subscription, error) {
+	if err := validate.Struct(filter); err != nil {
+		return nil, validationError(err)
 	}
 
-	subscriptions, err := s.repo.GetByEmail(email)
+	subscriptions, err := s.repo.GetByEmail(filter.Email)
 	if err != nil {
 		return nil, fmt.Errorf("service.GetSubscriptions: %w", err)
 	}
