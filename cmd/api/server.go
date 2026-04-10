@@ -17,22 +17,26 @@ import (
 )
 
 func main() {
+	// .env
 	err := godotenv.Load(".env")
 	if err != nil {
 		log.Fatalln("Error loading .env file:", err)
 	}
 
+	// config
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalln("Error loading config:", err)
 	}
 
+	// db connection
 	dbConn, err := db.ConnectDB(cfg.DSN())
 	if err != nil {
 		log.Fatalln("Error connecting to db:", err)
 	}
 	defer dbConn.Close()
 
+	// migrations
 	err = db.RunMigrations(dbConn)
 	if err != nil {
 		log.Fatalln("Error running migratrions:", err)
@@ -41,6 +45,7 @@ func main() {
 	port := cfg.ServerPort
 	githubApiToken := cfg.GithubToken
 
+	// dependencies
 	client := http.Client{Timeout: 10 * time.Second}
 	githubClient := githubapi.NewGithubClient(&client, githubApiToken)
 
@@ -51,6 +56,7 @@ func main() {
 	app := router.NewApp(subscriptionHandler)
 	mux := app.Router()
 
+	// server
 	server := http.Server{
 		Addr:    ":" + port,
 		Handler: mux,
