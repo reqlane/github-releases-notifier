@@ -15,6 +15,7 @@ import (
 	"github.com/reqlane/github-releases-notifier/internal/config"
 	"github.com/reqlane/github-releases-notifier/internal/db"
 	"github.com/reqlane/github-releases-notifier/internal/githubapi"
+	"github.com/reqlane/github-releases-notifier/internal/notifier"
 	"github.com/rs/zerolog"
 )
 
@@ -58,8 +59,16 @@ func main() {
 		Caller().
 		Logger()
 
+	notif := notifier.New(notifier.Config{
+		Host:          cfg.SMTPHost,
+		Port:          cfg.SMTPPort,
+		Username:      cfg.SMTPUsername,
+		Password:      cfg.SMTPPassword,
+		ServerBaseURL: cfg.ServerBaseURL,
+	})
+
 	subscriptionRepository := repository.NewSubcriptionRepository(dbConn)
-	subscriptionService := service.NewSubcriptionService(subscriptionRepository, githubClient)
+	subscriptionService := service.NewSubcriptionService(subscriptionRepository, githubClient, notif)
 	subscriptionHandler := handler.NewSubcriptionHandler(subscriptionService, errLogger)
 
 	app := router.NewApp(subscriptionHandler)

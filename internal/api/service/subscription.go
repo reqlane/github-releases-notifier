@@ -10,17 +10,20 @@ import (
 	"github.com/reqlane/github-releases-notifier/internal/apperror"
 	"github.com/reqlane/github-releases-notifier/internal/githubapi"
 	"github.com/reqlane/github-releases-notifier/internal/model"
+	"github.com/reqlane/github-releases-notifier/internal/notifier"
 )
 
 type SubscriptionService struct {
 	repo         *repository.SubscriptionRepository
 	githubClient *githubapi.GithubClient
+	notif        *notifier.Notifier
 }
 
-func NewSubcriptionService(repo *repository.SubscriptionRepository, githubClient *githubapi.GithubClient) *SubscriptionService {
+func NewSubcriptionService(r *repository.SubscriptionRepository, g *githubapi.GithubClient, n *notifier.Notifier) *SubscriptionService {
 	return &SubscriptionService{
-		repo:         repo,
-		githubClient: githubClient,
+		repo:         r,
+		githubClient: g,
+		notif:        n,
 	}
 }
 
@@ -83,7 +86,11 @@ func (s *SubscriptionService) Subscribe(req *model.SubscribeRequest) error {
 		return fmt.Errorf("service.Subscribe: %w", err)
 	}
 
-	// TODO Send confirmation email
+	// Send confirmation email
+	err = s.notif.SendConfirmation(req.Email, req.Repo, confirmToken, unsubscribeToken)
+	if err != nil {
+		return fmt.Errorf("service.Subscribe: %w", err)
+	}
 
 	return nil
 }

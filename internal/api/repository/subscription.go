@@ -56,7 +56,7 @@ func (r *SubscriptionRepository) CreateSubscription(email string, repoID int, co
 func (r *SubscriptionRepository) SubscriptionExists(email string, repoName string) (bool, error) {
 	query := `SELECT EXISTS(SELECT 1 FROM subscriptions s JOIN repos r ON s.repo_id = r.id WHERE s.email=? AND r.repo=?)`
 	var exists bool
-	err := r.db.QueryRow(query, email, repoName).Scan(exists)
+	err := r.db.QueryRow(query, email, repoName).Scan(&exists)
 	if err != nil {
 		return false, fmt.Errorf("repository.SubscriptionExists: %w", err)
 	}

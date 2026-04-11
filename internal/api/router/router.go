@@ -10,16 +10,19 @@ type app struct {
 	subscriptionHandler *handler.SubscriptionHandler
 }
 
-func NewApp(subscriptionHandler *handler.SubscriptionHandler) *app {
+func NewApp(h *handler.SubscriptionHandler) *app {
 	return &app{
-		subscriptionHandler: subscriptionHandler,
+		subscriptionHandler: h,
 	}
 }
 
 func (a *app) Router() *http.ServeMux {
 	mux := http.NewServeMux()
 
-	a.subscriptionRouter(mux)
+	apiMux := http.NewServeMux()
+	a.subscriptionRouter(apiMux)
+
+	mux.Handle("/api/", http.StripPrefix("/api", apiMux))
 
 	return mux
 }

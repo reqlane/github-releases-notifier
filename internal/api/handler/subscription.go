@@ -14,8 +14,8 @@ type SubscriptionHandler struct {
 	errLogger zerolog.Logger
 }
 
-func NewSubcriptionHandler(service *service.SubscriptionService, errLogger zerolog.Logger) *SubscriptionHandler {
-	return &SubscriptionHandler{service: service, errLogger: errLogger}
+func NewSubcriptionHandler(s *service.SubscriptionService, el zerolog.Logger) *SubscriptionHandler {
+	return &SubscriptionHandler{service: s, errLogger: el}
 }
 
 func (h *SubscriptionHandler) SubscribeHandler(w http.ResponseWriter, r *http.Request) {
