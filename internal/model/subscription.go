@@ -15,3 +15,9 @@ type SubscribeRequest struct {
 type SubscriptionFilter struct {
 	Email string `json:"email" validate:"required,email"`
 }
+
+type Repo struct {
+	ID          int
+	Repo        string
+	LastSeenTag string
+}
