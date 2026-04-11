@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/reqlane/github-releases-notifier/internal/apperror"
 )
@@ -31,11 +33,19 @@ func sendError(w http.ResponseWriter, message string, code int) {
 	sendJSON(w, code, response)
 }
 
-func sendFromAppError(w http.ResponseWriter, err error) {
+func (h *SubscriptionHandler) sendFromAppError(w http.ResponseWriter, err error) {
 	response := APIResponse{Status: "error"}
 	var code int
 
-	if ev, ok := errors.AsType[*apperror.ErrValidation](err); ok {
+	if e, ok := errors.AsType[*apperror.ErrGithubRepoNotFound](err); ok {
+		code = http.StatusNotFound
+		response.Message = fmt.Sprintf("Repository %s not found on GitHub", e.Repo)
+	} else if e, ok := errors.AsType[*apperror.ErrGithubAPIRateLimited](err); ok {
+		seconds := int(time.Until(e.ResetTime).Seconds())
+		w.Header().Set("Retry-After", strconv.Itoa(seconds))
+		code = http.StatusServiceUnavailable
+		response.Message = fmt.Sprintf("Service temporarily unavailable, please retry after %d seconds", seconds)
+	} else if ev, ok := errors.AsType[*apperror.ErrValidation](err); ok {
 		code = http.StatusBadRequest
 		response.Message = "Validation failed"
 		response.Details = make(map[string]string)
@@ -53,7 +63,11 @@ func sendFromAppError(w http.ResponseWriter, err error) {
 		}
 	} else {
 		code = http.StatusInternalServerError
-		response.Message = "An unexpected error occured"
+		response.Message = "Internal Server Error"
+	}
+
+	if code == http.StatusInternalServerError {
+		h.errLogger.Error().Err(err).Msg("unexpected error")
 	}
 
 	sendJSON(w, code, response)

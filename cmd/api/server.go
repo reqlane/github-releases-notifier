@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -14,6 +15,7 @@ import (
 	"github.com/reqlane/github-releases-notifier/internal/config"
 	"github.com/reqlane/github-releases-notifier/internal/db"
 	"github.com/reqlane/github-releases-notifier/internal/githubapi"
+	"github.com/rs/zerolog"
 )
 
 func main() {
@@ -49,9 +51,16 @@ func main() {
 	client := http.Client{Timeout: 10 * time.Second}
 	githubClient := githubapi.NewGithubClient(&client, githubApiToken)
 
+	errLogger := zerolog.New(os.Stderr).
+		Level(zerolog.ErrorLevel).
+		With().
+		Timestamp().
+		Caller().
+		Logger()
+
 	subscriptionRepository := repository.NewSubcriptionRepository(dbConn)
 	subscriptionService := service.NewSubcriptionService(subscriptionRepository, githubClient)
-	subscriptionHandler := handler.NewSubcriptionHandler(subscriptionService)
+	subscriptionHandler := handler.NewSubcriptionHandler(subscriptionService, errLogger)
 
 	app := router.NewApp(subscriptionHandler)
 	mux := app.Router()

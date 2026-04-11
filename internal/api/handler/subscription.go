@@ -6,14 +6,16 @@ import (
 
 	"github.com/reqlane/github-releases-notifier/internal/api/service"
 	"github.com/reqlane/github-releases-notifier/internal/model"
+	"github.com/rs/zerolog"
 )
 
 type SubscriptionHandler struct {
-	service *service.SubscriptionService
+	service   *service.SubscriptionService
+	errLogger zerolog.Logger
 }
 
-func NewSubcriptionHandler(service *service.SubscriptionService) *SubscriptionHandler {
-	return &SubscriptionHandler{service: service}
+func NewSubcriptionHandler(service *service.SubscriptionService, errLogger zerolog.Logger) *SubscriptionHandler {
+	return &SubscriptionHandler{service: service, errLogger: errLogger}
 }
 
 func (h *SubscriptionHandler) SubscribeHandler(w http.ResponseWriter, r *http.Request) {
@@ -28,7 +30,7 @@ func (h *SubscriptionHandler) SubscribeHandler(w http.ResponseWriter, r *http.Re
 
 	err = h.service.Subscribe(&subscribeRequest)
 	if err != nil {
-		sendFromAppError(w, err)
+		h.sendFromAppError(w, err)
 		return
 	}
 
@@ -40,7 +42,7 @@ func (h *SubscriptionHandler) ConfirmHandler(w http.ResponseWriter, r *http.Requ
 
 	err := h.service.Confirm(token)
 	if err != nil {
-		sendFromAppError(w, err)
+		h.sendFromAppError(w, err)
 		return
 	}
 
@@ -52,7 +54,7 @@ func (h *SubscriptionHandler) UnsubscribeHandler(w http.ResponseWriter, r *http.
 
 	err := h.service.Unsubscribe(token)
 	if err != nil {
-		sendFromAppError(w, err)
+		h.sendFromAppError(w, err)
 		return
 	}
 
@@ -64,7 +66,7 @@ func (h *SubscriptionHandler) GetSubscriptionsHandler(w http.ResponseWriter, r *
 
 	subscriptions, err := h.service.GetSubscriptions(filter)
 	if err != nil {
-		sendFromAppError(w, err)
+		h.sendFromAppError(w, err)
 		return
 	}
 
