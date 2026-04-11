@@ -4,10 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 )
 
-// invalid github API token
-var ErrInvalidGithubAPIToken = errors.New("invalid github api token in server configuration")
+var (
+	ErrGithubForbidden       = errors.New("403 forbidden response from github api")
+	ErrInvalidGithubAPIToken = errors.New("invalid github api token in server configuration")
+	ErrGithubRepoNoReleases  = errors.New("github repo has no releases yet")
+)
 
 // github repo not found
 type ErrGithubRepoNotFound struct {
@@ -20,14 +24,11 @@ func (e *ErrGithubRepoNotFound) Error() string {
 
 // github API rate limit exceeded
 type ErrGithubAPIRateLimited struct {
-	RetryAfter string
+	ResetTime time.Time
 }
 
 func (e *ErrGithubAPIRateLimited) Error() string {
-	if e.RetryAfter == "" {
-		return "github api rate limit exceeded, retry later"
-	}
-	return fmt.Sprintf("github api rate limit exceeded, retry after %s seconds", e.RetryAfter)
+	return fmt.Sprintf("github api rate limit exceeded, retry after %s", e.ResetTime.Format(time.RFC3339))
 }
 
 // validation
