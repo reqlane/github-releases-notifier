@@ -3,54 +3,69 @@ package mock
 import "github.com/reqlane/github-releases-notifier/internal/model"
 
 type MockRepository struct {
-	getSubscriptionsByEmail      func(email string) ([]model.Subscription, error)
-	createSubscription           func(email string, repoID int, confirmToken, unsubscribeToken string) error
-	subscriptionExists           func(email string, repoName string) (bool, error)
-	confirmSubscription          func(confirmToken string) error
-	deleteSubscription           func(unsubscribeToken string) error
-	getRepoByName                func(repoName string) (model.Repo, error)
-	createRepo                   func(repo model.Repo) (model.Repo, error)
-	getSubscribedRepos           func() ([]model.Repo, error)
-	getNotificationTargetsByRepo func(repoID int) ([]model.NotificationTarget, error)
-	updateLastSeenTag            func(repoID int, tag string) error
+	GetSubscriptionsByEmailFunc      func(email string) ([]model.Subscription, error)
+	CreateSubscriptionFunc           func(email string, repoID int, confirmToken, unsubscribeToken string) error
+	SubscriptionExistsFunc           func(email string, repoName string) (bool, error)
+	ConfirmSubscriptionFunc          func(confirmToken string) error
+	DeleteSubscriptionFunc           func(unsubscribeToken string) error
+	GetRepoByNameFunc                func(repoName string) (model.Repo, error)
+	CreateRepoFunc                   func(repo model.Repo) (model.Repo, error)
+	GetSubscribedReposFunc           func() ([]model.Repo, error)
+	GetNotificationTargetsByRepoFunc func(repoID int) ([]model.NotificationTarget, error)
+	UpdateLastSeenTagFunc            func(repoID int, tag string) error
 }
 
 func (m *MockRepository) GetSubscriptionsByEmail(email string) ([]model.Subscription, error) {
-	return m.getSubscriptionsByEmail(email)
+	return m.GetSubscriptionsByEmailFunc(email)
 }
 
 func (m *MockRepository) CreateSubscription(email string, repoID int, confirmToken, unsubscribeToken string) error {
-	return m.createSubscription(email, repoID, confirmToken, unsubscribeToken)
+	return m.CreateSubscriptionFunc(email, repoID, confirmToken, unsubscribeToken)
 }
 
 func (m *MockRepository) SubscriptionExists(email string, repoName string) (bool, error) {
-	return m.subscriptionExists(email, repoName)
+	return m.SubscriptionExistsFunc(email, repoName)
 }
 
 func (m *MockRepository) ConfirmSubscription(confirmToken string) error {
-	return m.confirmSubscription(confirmToken)
+	return m.ConfirmSubscriptionFunc(confirmToken)
 }
 
 func (m *MockRepository) DeleteSubscription(unsubscribeToken string) error {
-	return m.deleteSubscription(unsubscribeToken)
+	return m.DeleteSubscriptionFunc(unsubscribeToken)
 }
 
 func (m *MockRepository) GetRepoByName(repoName string) (model.Repo, error) {
-	return m.getRepoByName(repoName)
+	return m.GetRepoByNameFunc(repoName)
 }
 
 func (m *MockRepository) CreateRepo(repo model.Repo) (model.Repo, error) {
-	return m.createRepo(repo)
+	return m.CreateRepoFunc(repo)
 }
 
 func (m *MockRepository) GetSubscribedRepos() ([]model.Repo, error) {
-	return m.getSubscribedRepos()
+	return m.GetSubscribedReposFunc()
 }
 
 func (m *MockRepository) GetNotificationTargetsByRepo(repoID int) ([]model.NotificationTarget, error) {
-	return m.getNotificationTargetsByRepo(repoID)
+	return m.GetNotificationTargetsByRepoFunc(repoID)
 }
 
 func (m *MockRepository) UpdateLastSeenTag(repoID int, tag string) error {
-	return m.updateLastSeenTag(repoID, tag)
+	return m.UpdateLastSeenTagFunc(repoID, tag)
+}
+
+func IdealRepository() *MockRepository {
+	return &MockRepository{
+		GetSubscriptionsByEmailFunc:      func(email string) ([]model.Subscription, error) { return []model.Subscription{}, nil },
+		CreateSubscriptionFunc:           func(email string, repoID int, confirmToken, unsubscribeToken string) error { return nil },
+		SubscriptionExistsFunc:           func(email, repoName string) (bool, error) { return false, nil },
+		ConfirmSubscriptionFunc:          func(confirmToken string) error { return nil },
+		DeleteSubscriptionFunc:           func(unsubscribeToken string) error { return nil },
+		GetRepoByNameFunc:                func(repoName string) (model.Repo, error) { return model.Repo{}, nil },
+		CreateRepoFunc:                   func(repo model.Repo) (model.Repo, error) { return model.Repo{}, nil },
+		GetSubscribedReposFunc:           func() ([]model.Repo, error) { return []model.Repo{}, nil },
+		GetNotificationTargetsByRepoFunc: func(repoID int) ([]model.NotificationTarget, error) { return []model.NotificationTarget{}, nil },
+		UpdateLastSeenTagFunc:            func(repoID int, tag string) error { return nil },
+	}
 }

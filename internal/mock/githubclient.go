@@ -1,14 +1,21 @@
 package mock
 
 type MockGithubClient struct {
-	repoExists       func(repo string) error
-	getLatestRelease func(repo string) (string, error)
+	RepoExistsFunc       func(repo string) error
+	GetLatestReleaseFunc func(repo string) (string, error)
 }
 
 func (m *MockGithubClient) RepoExists(repo string) error {
-	return m.repoExists(repo)
+	return m.RepoExistsFunc(repo)
 }
 
 func (m *MockGithubClient) GetLatestRelease(repo string) (string, error) {
-	return m.getLatestRelease(repo)
+	return m.GetLatestReleaseFunc(repo)
+}
+
+func IdealGithubClient() *MockGithubClient {
+	return &MockGithubClient{
+		RepoExistsFunc:       func(repo string) error { return nil },
+		GetLatestReleaseFunc: func(repo string) (string, error) { return "v1.0.0", nil },
+	}
 }
