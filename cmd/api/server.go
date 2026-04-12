@@ -21,29 +21,38 @@ import (
 )
 
 func main() {
-	// .env
+	// Logger
+	logger := zerolog.New(os.Stderr).
+		With().
+		Timestamp().
+		Logger()
+
+	// .env (if not using Docker)
 	err := godotenv.Load(".env")
 	if err != nil {
-		log.Fatalln("Error loading .env file:", err)
+		logger.Warn().Str("error message", err.Error()).Msg("error loading .env file, assuming docker is being used")
 	}
 
 	// Config
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalln("Error loading config:", err)
+		logger.Err(err).Msg("error loading config")
+		os.Exit(1)
 	}
 
 	// DB connection
 	dbConn, err := db.ConnectDB(cfg.DSN())
 	if err != nil {
-		log.Fatalln("Error connecting to db:", err)
+		logger.Err(err).Msg("error connecting to db")
+		os.Exit(1)
 	}
 	defer dbConn.Close()
 
 	// Migrations
 	err = db.RunMigrations(dbConn)
 	if err != nil {
-		log.Fatalln("Error running migratrions:", err)
+		logger.Err(err).Msg("error running migrations")
+		os.Exit(1)
 	}
 
 	port := cfg.ServerPort
@@ -52,11 +61,6 @@ func main() {
 	// Dependencies
 	client := http.Client{Timeout: 10 * time.Second}
 	githubClient := githubapi.NewGithubClient(&client, githubApiToken)
-
-	logger := zerolog.New(os.Stderr).
-		With().
-		Timestamp().
-		Logger()
 
 	notif := notifier.New(notifier.Config{
 		Host:          cfg.SMTPHost,
