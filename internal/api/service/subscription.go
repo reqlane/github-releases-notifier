@@ -6,20 +6,20 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/reqlane/github-releases-notifier/internal/api/repository"
 	"github.com/reqlane/github-releases-notifier/internal/apperror"
 	"github.com/reqlane/github-releases-notifier/internal/githubapi"
 	"github.com/reqlane/github-releases-notifier/internal/model"
 	"github.com/reqlane/github-releases-notifier/internal/notifier"
+	"github.com/reqlane/github-releases-notifier/internal/repository"
 )
 
 type SubscriptionService struct {
-	repo         *repository.SubscriptionRepository
+	repo         *repository.Repository
 	githubClient *githubapi.GithubClient
 	notif        *notifier.Notifier
 }
 
-func NewSubcriptionService(r *repository.SubscriptionRepository, g *githubapi.GithubClient, n *notifier.Notifier) *SubscriptionService {
+func NewSubcriptionService(r *repository.Repository, g *githubapi.GithubClient, n *notifier.Notifier) *SubscriptionService {
 	return &SubscriptionService{
 		repo:         r,
 		githubClient: g,

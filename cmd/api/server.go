@@ -9,13 +9,13 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/reqlane/github-releases-notifier/internal/api/handler"
-	"github.com/reqlane/github-releases-notifier/internal/api/repository"
 	"github.com/reqlane/github-releases-notifier/internal/api/router"
 	"github.com/reqlane/github-releases-notifier/internal/api/service"
 	"github.com/reqlane/github-releases-notifier/internal/config"
 	"github.com/reqlane/github-releases-notifier/internal/db"
 	"github.com/reqlane/github-releases-notifier/internal/githubapi"
 	"github.com/reqlane/github-releases-notifier/internal/notifier"
+	"github.com/reqlane/github-releases-notifier/internal/repository"
 	"github.com/rs/zerolog"
 )
 
@@ -67,8 +67,8 @@ func main() {
 		ServerBaseURL: cfg.ServerBaseURL,
 	})
 
-	subscriptionRepository := repository.NewSubcriptionRepository(dbConn)
-	subscriptionService := service.NewSubcriptionService(subscriptionRepository, githubClient, notif)
+	repository := repository.NewRepository(dbConn)
+	subscriptionService := service.NewSubcriptionService(repository, githubClient, notif)
 	subscriptionHandler := handler.NewSubcriptionHandler(subscriptionService, errLogger)
 
 	app := router.NewApp(subscriptionHandler)
