@@ -73,7 +73,7 @@ func (h *SubscriptionHandler) sendFromAppError(w http.ResponseWriter, err error)
 	}
 
 	if code == http.StatusInternalServerError {
-		h.errLogger.Error().Err(err).Msg("unexpected error")
+		h.logger.Err(err).Msg("unexpected error")
 	}
 
 	sendJSON(w, code, response)

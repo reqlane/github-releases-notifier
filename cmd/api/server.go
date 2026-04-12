@@ -27,20 +27,20 @@ func main() {
 		log.Fatalln("Error loading .env file:", err)
 	}
 
-	// config
+	// Config
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalln("Error loading config:", err)
 	}
 
-	// db connection
+	// DB connection
 	dbConn, err := db.ConnectDB(cfg.DSN())
 	if err != nil {
 		log.Fatalln("Error connecting to db:", err)
 	}
 	defer dbConn.Close()
 
-	// migrations
+	// Migrations
 	err = db.RunMigrations(dbConn)
 	if err != nil {
 		log.Fatalln("Error running migratrions:", err)
@@ -49,15 +49,13 @@ func main() {
 	port := cfg.ServerPort
 	githubApiToken := cfg.GithubToken
 
-	// dependencies
+	// Dependencies
 	client := http.Client{Timeout: 10 * time.Second}
 	githubClient := githubapi.NewGithubClient(&client, githubApiToken)
 
-	errLogger := zerolog.New(os.Stderr).
-		Level(zerolog.ErrorLevel).
+	logger := zerolog.New(os.Stderr).
 		With().
 		Timestamp().
-		Caller().
 		Logger()
 
 	notif := notifier.New(notifier.Config{
@@ -70,16 +68,19 @@ func main() {
 
 	repository := repository.NewRepository(dbConn)
 	subscriptionService := service.NewSubcriptionService(repository, githubClient, notif)
-	subscriptionHandler := handler.NewSubcriptionHandler(subscriptionService, errLogger)
+	subscriptionHandler := handler.NewSubcriptionHandler(subscriptionService, logger)
 
-	// start scanner
-	scan := scanner.New(repository, githubClient, notif)
+	// Start scanner
+	scan := scanner.New(repository, githubClient, notif, logger)
+	if githubApiToken == "" {
+		scan.SetRequestsPerMin(1)
+	}
 	go scan.Run()
 
 	app := router.NewApp(subscriptionHandler)
 	mux := app.Router()
 
-	// server
+	// Server
 	server := http.Server{
 		Addr:    ":" + port,
 		Handler: mux,

@@ -10,12 +10,12 @@ import (
 )
 
 type SubscriptionHandler struct {
-	service   *service.SubscriptionService
-	errLogger zerolog.Logger
+	service *service.SubscriptionService
+	logger  zerolog.Logger
 }
 
 func NewSubcriptionHandler(s *service.SubscriptionService, el zerolog.Logger) *SubscriptionHandler {
-	return &SubscriptionHandler{service: s, errLogger: el}
+	return &SubscriptionHandler{service: s, logger: el}
 }
 
 func (h *SubscriptionHandler) SubscribeHandler(w http.ResponseWriter, r *http.Request) {
