@@ -10,12 +10,29 @@ import (
 var (
 	ErrNotFound                  = errors.New("not found")
 	ErrAlreadyExists             = errors.New("resource already exists")
-	ErrSubscriptionAlreadyExists = errors.New("subscription already exists")
-	ErrGithubRepoNotFound        = errors.New("github repo not found")
 	ErrGithubRepoNoReleases      = errors.New("github repo has no releases yet")
 	ErrGithubForbidden           = errors.New("403 forbidden response from github api")
 	ErrInvalidGithubAPIToken     = errors.New("invalid github api token in server configuration")
+	ErrSubscriptionAlreadyExists = errors.New("subscription already exists")
 )
+
+// resource invalid
+type ErrInvalidResource struct {
+	Resource string
+}
+
+func (e *ErrInvalidResource) Error() string {
+	return fmt.Sprintf("%s is invalid", e.Resource)
+}
+
+// resource not found
+type ErrResourceNotFound struct {
+	Resource string
+}
+
+func (e *ErrResourceNotFound) Error() string {
+	return fmt.Sprintf("%s not found", e.Resource)
+}
 
 // github API rate limit exceeded
 type ErrGithubAPIRateLimited struct {

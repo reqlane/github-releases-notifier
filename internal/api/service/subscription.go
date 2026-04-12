@@ -29,7 +29,7 @@ func NewSubcriptionService(r *repository.SubscriptionRepository, g *githubapi.Gi
 
 func (s *SubscriptionService) Subscribe(req *model.SubscribeRequest) error {
 	if err := validate.Struct(req); err != nil {
-		return validationError(err)
+		return structValidationError(err)
 	}
 
 	// Check if email already subscribed on repo
@@ -61,6 +61,7 @@ func (s *SubscriptionService) Subscribe(req *model.SubscribeRequest) error {
 	if errors.Is(err, apperror.ErrNotFound) {
 		repo, err = s.repo.CreateRepo(model.Repo{Repo: req.Repo, LastSeenTag: lastSeenTag})
 		if err != nil {
+			// possible race condition
 			if errors.Is(err, apperror.ErrAlreadyExists) {
 				repo, err = s.repo.GetRepoByName(req.Repo)
 				if err != nil {
@@ -96,19 +97,43 @@ func (s *SubscriptionService) Subscribe(req *model.SubscribeRequest) error {
 }
 
 func (s *SubscriptionService) Confirm(token string) error {
+	if !isValidToken(token) {
+		return &apperror.ErrInvalidResource{Resource: "Token"}
+	}
+
+	err := s.repo.ConfirmSubscription(token)
+	if err != nil {
+		if errors.Is(err, apperror.ErrNotFound) {
+			return &apperror.ErrResourceNotFound{Resource: "Token"}
+		}
+		return fmt.Errorf("service.Confirm: %w", err)
+	}
+
 	return nil
 }
 
 func (s *SubscriptionService) Unsubscribe(token string) error {
+	if !isValidToken(token) {
+		return &apperror.ErrInvalidResource{Resource: "Token"}
+	}
+
+	err := s.repo.DeleteSubscription(token)
+	if err != nil {
+		if errors.Is(err, apperror.ErrNotFound) {
+			return &apperror.ErrResourceNotFound{Resource: "Token"}
+		}
+		return fmt.Errorf("service.Unsubscribe: %w", err)
+	}
+
 	return nil
 }
 
-func (s *SubscriptionService) GetSubscriptions(filter *model.SubscriptionFilter) ([]model.Subscription, error) {
-	if err := validate.Struct(filter); err != nil {
-		return nil, validationError(err)
+func (s *SubscriptionService) GetSubscriptions(email string) ([]model.Subscription, error) {
+	if err := validate.Var(email, "email"); err != nil {
+		return nil, &apperror.ErrInvalidResource{Resource: "Email"}
 	}
 
-	subscriptions, err := s.repo.GetSubscriptionsByEmail(filter.Email)
+	subscriptions, err := s.repo.GetSubscriptionsByEmail(email)
 	if err != nil {
 		return nil, fmt.Errorf("service.GetSubscriptions: %w", err)
 	}
@@ -123,4 +148,9 @@ func generateToken() (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(b), nil
+}
+
+func isValidToken(token string) bool {
+	b, err := hex.DecodeString(token)
+	return err == nil && len(b) == 32
 }

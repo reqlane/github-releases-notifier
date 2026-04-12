@@ -73,7 +73,7 @@ func (g *GithubClient) RepoExists(repo string) error {
 		}
 		return apperror.ErrGithubForbidden
 	case http.StatusNotFound:
-		return apperror.ErrGithubRepoNotFound
+		return &apperror.ErrResourceNotFound{Resource: "Github repository"}
 	case http.StatusTooManyRequests:
 		t := g.handleRateLimit(resp)
 		return &apperror.ErrGithubAPIRateLimited{ResetTime: t}

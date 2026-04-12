@@ -63,6 +63,42 @@ func (r *SubscriptionRepository) SubscriptionExists(email string, repoName strin
 	return exists, nil
 }
 
+func (r *SubscriptionRepository) ConfirmSubscription(confirmToken string) error {
+	query := `UPDATE subscriptions SET confirmed=true, confirm_token=NULL WHERE confirm_token=?`
+	res, err := r.db.Exec(query, confirmToken)
+	if err != nil {
+		return fmt.Errorf("repository.ConfirmSubscription: %w", err)
+	}
+
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("repository.ConfirmSubscription: %w", err)
+	}
+	if rowsAffected == 0 {
+		return apperror.ErrNotFound
+	}
+
+	return nil
+}
+
+func (r *SubscriptionRepository) DeleteSubscription(unsubscribeToken string) error {
+	query := `DELETE FROM subscriptions WHERE unsubscribe_token=?`
+	res, err := r.db.Exec(query, unsubscribeToken)
+	if err != nil {
+		return fmt.Errorf("repository.DeleteSubscription: %w", err)
+	}
+
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("repository.DeleteSubscription: %w", err)
+	}
+	if rowsAffected == 0 {
+		return apperror.ErrNotFound
+	}
+
+	return nil
+}
+
 func (r *SubscriptionRepository) GetRepoByName(repoName string) (model.Repo, error) {
 	query := `SELECT id, repo, last_seen_tag FROM repos WHERE repo=?`
 	var repo model.Repo

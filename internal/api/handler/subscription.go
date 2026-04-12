@@ -62,9 +62,9 @@ func (h *SubscriptionHandler) UnsubscribeHandler(w http.ResponseWriter, r *http.
 }
 
 func (h *SubscriptionHandler) GetSubscriptionsHandler(w http.ResponseWriter, r *http.Request) {
-	filter := &model.SubscriptionFilter{Email: r.URL.Query().Get("email")}
+	email := r.URL.Query().Get("email")
 
-	subscriptions, err := h.service.GetSubscriptions(filter)
+	subscriptions, err := h.service.GetSubscriptions(email)
 	if err != nil {
 		h.sendFromAppError(w, err)
 		return

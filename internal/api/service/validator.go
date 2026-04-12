@@ -33,7 +33,7 @@ func init() {
 	})
 }
 
-func validationError(err error) error {
+func structValidationError(err error) error {
 	if ve, ok := err.(validator.ValidationErrors); ok {
 		errVal := &apperror.ErrValidation{}
 		for _, fe := range ve {

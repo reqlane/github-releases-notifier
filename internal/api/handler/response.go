@@ -40,9 +40,12 @@ func (h *SubscriptionHandler) sendFromAppError(w http.ResponseWriter, err error)
 	if errors.Is(err, apperror.ErrSubscriptionAlreadyExists) {
 		code = http.StatusConflict
 		response.Message = "Email already subscribed to this repository"
-	} else if errors.Is(err, apperror.ErrGithubRepoNotFound) {
+	} else if e, ok := errors.AsType[*apperror.ErrInvalidResource](err); ok {
+		code = http.StatusBadRequest
+		response.Message = fmt.Sprintf("%s is invalid", e.Resource)
+	} else if e, ok := errors.AsType[*apperror.ErrResourceNotFound](err); ok {
 		code = http.StatusNotFound
-		response.Message = "Repository not found on GitHub"
+		response.Message = fmt.Sprintf("%s not found", e.Resource)
 	} else if e, ok := errors.AsType[*apperror.ErrGithubAPIRateLimited](err); ok {
 		seconds := int(time.Until(e.ResetTime).Seconds())
 		w.Header().Set("Retry-After", strconv.Itoa(seconds))
