@@ -16,6 +16,7 @@ import (
 	"github.com/reqlane/github-releases-notifier/internal/githubapi"
 	"github.com/reqlane/github-releases-notifier/internal/notifier"
 	"github.com/reqlane/github-releases-notifier/internal/repository"
+	"github.com/reqlane/github-releases-notifier/internal/scanner"
 	"github.com/rs/zerolog"
 )
 
@@ -70,6 +71,10 @@ func main() {
 	repository := repository.NewRepository(dbConn)
 	subscriptionService := service.NewSubcriptionService(repository, githubClient, notif)
 	subscriptionHandler := handler.NewSubcriptionHandler(subscriptionService, errLogger)
+
+	// start scanner
+	scan := scanner.New(repository, githubClient, notif)
+	go scan.Run()
 
 	app := router.NewApp(subscriptionHandler)
 	mux := app.Router()

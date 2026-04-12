@@ -28,16 +28,31 @@ func (n *Notifier) SendConfirmation(recipient, repo, confirmToken, unsubscribeTo
 	repoURL := fmt.Sprintf("https://github.com/%s", repo)
 	confirmURL := fmt.Sprintf("%s/api/confirm/%s", n.serverBaseURL, confirmToken)
 	unsubscribeURL := fmt.Sprintf("%s/api/unsubscribe/%s", n.serverBaseURL, unsubscribeToken)
-	body := fmt.Sprintf("You requested to subscribe to new releases notifications for the Github repository:\n"+
-		"%s\n\n"+
-		"To confirm your subscription, click the link below:\n"+
-		"%s\n\n"+
-		"If you did not request this, simply ignore this email.\n\n"+
-		"To unsubscribe at any time, click here:\n"+
-		"%s",
-		repoURL,
-		confirmURL,
-		unsubscribeURL,
+	body := fmt.Sprintf(
+		"You requested to subscribe to new releases notifications for the Github repository:\n"+
+			"%s\n\n"+
+			"To confirm your subscription, click the link below:\n"+
+			"%s\n\n"+
+			"If you did not request this, simply ignore this email.\n\n"+
+			"To unsubscribe at any time, click here:\n"+
+			"%s",
+		repoURL, confirmURL, unsubscribeURL,
+	)
+	return n.sendEmail(recipient, subject, body)
+}
+
+func (n *Notifier) SendNotification(recipient, repo, tag, unsubscribeToken string) error {
+	subject := fmt.Sprintf("New release: %s (%s)", repo, tag)
+	repoURL := fmt.Sprintf("https://github.com/%s", repo)
+	releaseURL := fmt.Sprintf("%s/releases/tag/%s", repoURL, tag)
+	unsubscribeURL := fmt.Sprintf("%s/api/unsubscribe/%s", n.serverBaseURL, unsubscribeToken)
+	body := fmt.Sprintf(
+		"A new release %s is available for %s.\n\n"+
+			"Repository: %s\n"+
+			"Release: %s\n\n"+
+			"To cancel your subscription from these notifications, click here:\n"+
+			"%s",
+		tag, repo, repoURL, releaseURL, unsubscribeURL,
 	)
 	return n.sendEmail(recipient, subject, body)
 }

@@ -17,3 +17,8 @@ type Repo struct {
 	Repo        string
 	LastSeenTag string
 }
+
+type NotificationTarget struct {
+	Email            string
+	UnsubscribeToken string
+}

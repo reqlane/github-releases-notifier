@@ -13,13 +13,6 @@ import (
 
 const githubAPIVersion = "2026-03-10"
 
-// Token - 5000/h (429) | No token - 60/h (403)
-//
-// Calculating points for the secondary rate limit
-// Most REST API GET, HEAD, and OPTIONS requests - 1 point
-//
-// No more than 100 concurrent requests are allowed.
-// No more than 900 points per minute are allowed for REST API endpoints.
 type GithubClient struct {
 	client       *http.Client
 	apiToken     string

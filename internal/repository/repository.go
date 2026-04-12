@@ -135,3 +135,64 @@ func (r *Repository) CreateRepo(repo model.Repo) (model.Repo, error) {
 	repo.ID = int(id)
 	return repo, nil
 }
+
+func (r *Repository) GetSubscribedRepos() ([]model.Repo, error) {
+	query := `SELECT id, repo, last_seen_tag FROM repos WHERE EXISTS (SELECT 1 FROM subscriptions WHERE repo_id=repos.id AND confirmed=true)`
+	rows, err := r.db.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("repository.GetSubscribedRepos: %w", err)
+	}
+	defer rows.Close()
+
+	repos := make([]model.Repo, 0)
+	for rows.Next() {
+		var repo model.Repo
+		err = rows.Scan(&repo.ID, &repo.Repo, &repo.LastSeenTag)
+		if err != nil {
+			return nil, fmt.Errorf("repository.GetSubscribedRepos: %w", err)
+		}
+		repos = append(repos, repo)
+	}
+
+	err = rows.Err()
+	if err != nil {
+		return nil, fmt.Errorf("repository.GetSubscribedRepos: %w", err)
+	}
+
+	return repos, nil
+}
+
+func (r *Repository) GetNotificationTargetsByRepo(repoID int) ([]model.NotificationTarget, error) {
+	query := `SELECT email, unsubscribe_token FROM subscribers WHERE repo_id=? AND confirmed=true`
+	rows, err := r.db.Query(query, repoID)
+	if err != nil {
+		return nil, fmt.Errorf("repository.GetSubscribersByRepo: %w", err)
+	}
+	defer rows.Close()
+
+	targets := make([]model.NotificationTarget, 0)
+	for rows.Next() {
+		var target model.NotificationTarget
+		err = rows.Scan(&target.Email, &target.UnsubscribeToken)
+		if err != nil {
+			return nil, fmt.Errorf("repository.GetSubscribersByRepo: %w", err)
+		}
+		targets = append(targets, target)
+	}
+
+	err = rows.Err()
+	if err != nil {
+		return nil, fmt.Errorf("repository.GetSubscribersByRepo: %w", err)
+	}
+
+	return targets, nil
+}
+
+func (r *Repository) UpdateLastSeenTag(repoID int, tag string) error {
+	query := `UPDATE repos SET last_seen_tag=? WHERE id=?`
+	_, err := r.db.Exec(query, tag, repoID)
+	if err != nil {
+		return fmt.Errorf("repository.UpdateLastSeenTag: %w", err)
+	}
+	return nil
+}
