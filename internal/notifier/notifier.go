@@ -6,12 +6,17 @@ import (
 	gomail "gopkg.in/mail.v2"
 )
 
-type Notifier struct {
+type Notifier interface {
+	SendConfirmation(recipient, repo, confirmToken, unsubscribeToken string) error
+	SendNotification(recipient, repo, tag, unsubscribeToken string) error
+}
+
+type SMTPNotifier struct {
 	dialer        *gomail.Dialer
 	serverBaseURL string
 }
 
-type Config struct {
+type SMTPNotifierConfig struct {
 	Host          string
 	Port          int
 	Username      string
@@ -19,11 +24,11 @@ type Config struct {
 	ServerBaseURL string
 }
 
-func New(c Config) *Notifier {
-	return &Notifier{dialer: gomail.NewDialer(c.Host, c.Port, c.Username, c.Password), serverBaseURL: c.ServerBaseURL}
+func NewSMTPNotifier(c SMTPNotifierConfig) Notifier {
+	return &SMTPNotifier{dialer: gomail.NewDialer(c.Host, c.Port, c.Username, c.Password), serverBaseURL: c.ServerBaseURL}
 }
 
-func (n *Notifier) SendConfirmation(recipient, repo, confirmToken, unsubscribeToken string) error {
+func (n *SMTPNotifier) SendConfirmation(recipient, repo, confirmToken, unsubscribeToken string) error {
 	subject := fmt.Sprintf("Confirm your subscription to %s", repo)
 	repoURL := fmt.Sprintf("https://github.com/%s", repo)
 	confirmURL := fmt.Sprintf("%s/api/confirm/%s", n.serverBaseURL, confirmToken)
@@ -41,7 +46,7 @@ func (n *Notifier) SendConfirmation(recipient, repo, confirmToken, unsubscribeTo
 	return n.sendEmail(recipient, subject, body)
 }
 
-func (n *Notifier) SendNotification(recipient, repo, tag, unsubscribeToken string) error {
+func (n *SMTPNotifier) SendNotification(recipient, repo, tag, unsubscribeToken string) error {
 	subject := fmt.Sprintf("New release: %s (%s)", repo, tag)
 	repoURL := fmt.Sprintf("https://github.com/%s", repo)
 	releaseURL := fmt.Sprintf("%s/releases/tag/%s", repoURL, tag)
@@ -57,7 +62,7 @@ func (n *Notifier) SendNotification(recipient, repo, tag, unsubscribeToken strin
 	return n.sendEmail(recipient, subject, body)
 }
 
-func (n *Notifier) sendEmail(recipient, subject, body string) error {
+func (n *SMTPNotifier) sendEmail(recipient, subject, body string) error {
 	m := gomail.NewMessage()
 	m.SetHeader("From", n.dialer.Username)
 	m.SetHeader("To", recipient)

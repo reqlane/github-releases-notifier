@@ -60,9 +60,9 @@ func main() {
 
 	// Dependencies
 	client := http.Client{Timeout: 10 * time.Second}
-	githubClient := githubapi.NewGithubClient(&client, githubApiToken)
+	githubClient := githubapi.NewHTTPGithubClient(&client, githubApiToken)
 
-	notif := notifier.New(notifier.Config{
+	notif := notifier.NewSMTPNotifier(notifier.SMTPNotifierConfig{
 		Host:          cfg.SMTPHost,
 		Port:          cfg.SMTPPort,
 		Username:      cfg.SMTPUsername,
@@ -70,12 +70,12 @@ func main() {
 		ServerBaseURL: cfg.ServerBaseURL,
 	})
 
-	repository := repository.NewRepository(dbConn)
+	repository := repository.NewMariaDBRepository(dbConn)
 	subscriptionService := service.NewSubcriptionService(repository, githubClient, notif)
 	subscriptionHandler := handler.NewSubcriptionHandler(subscriptionService, logger)
 
 	// Start scanner
-	scan := scanner.New(repository, githubClient, notif, logger)
+	scan := scanner.NewFixedRateScanner(repository, githubClient, notif, logger)
 	if githubApiToken == "" {
 		scan.SetRequestsPerMin(1)
 	}

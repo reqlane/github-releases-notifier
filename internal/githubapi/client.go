@@ -13,30 +13,35 @@ import (
 
 const githubAPIVersion = "2026-03-10"
 
-type GithubClient struct {
+type GithubClient interface {
+	RepoExists(repo string) error
+	GetLatestRelease(repo string) (string, error)
+}
+
+type HTTPGithubClient struct {
 	client       *http.Client
 	apiToken     string
 	blockedUntil time.Time
 	mu           sync.RWMutex
 }
 
-func NewGithubClient(client *http.Client, apiToken string) *GithubClient {
-	return &GithubClient{client: client, apiToken: apiToken}
+func NewHTTPGithubClient(client *http.Client, apiToken string) GithubClient {
+	return &HTTPGithubClient{client: client, apiToken: apiToken}
 }
 
-func (g *GithubClient) blockStatus() (bool, time.Time) {
+func (g *HTTPGithubClient) blockStatus() (bool, time.Time) {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 	return time.Now().Before(g.blockedUntil), g.blockedUntil
 }
 
-func (g *GithubClient) blockUntil(t time.Time) {
+func (g *HTTPGithubClient) blockUntil(t time.Time) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	g.blockedUntil = t
 }
 
-func (g *GithubClient) RepoExists(repo string) error {
+func (g *HTTPGithubClient) RepoExists(repo string) error {
 	if blocked, until := g.blockStatus(); blocked {
 		return &apperror.ErrGithubAPIRateLimited{ResetTime: until}
 	}
@@ -75,7 +80,7 @@ func (g *GithubClient) RepoExists(repo string) error {
 	}
 }
 
-func (g *GithubClient) GetLatestRelease(repo string) (string, error) {
+func (g *HTTPGithubClient) GetLatestRelease(repo string) (string, error) {
 	if blocked, until := g.blockStatus(); blocked {
 		return "", &apperror.ErrGithubAPIRateLimited{ResetTime: until}
 	}
@@ -126,7 +131,7 @@ func (g *GithubClient) GetLatestRelease(repo string) (string, error) {
 // If the x-ratelimit-remaining header is 0, you should not make another request until after the time specified by the x-ratelimit-reset header.
 // The x-ratelimit-reset header is in UTC epoch seconds.
 // Otherwise, wait for at least one minute before retrying.
-func (g *GithubClient) handleRateLimit(resp *http.Response) time.Time {
+func (g *HTTPGithubClient) handleRateLimit(resp *http.Response) time.Time {
 	if retryAfter := resp.Header.Get("Retry-After"); retryAfter != "" {
 		seconds, err := strconv.ParseInt(retryAfter, 10, 64)
 		if err == nil {
@@ -150,7 +155,7 @@ func (g *GithubClient) handleRateLimit(resp *http.Response) time.Time {
 	return t
 }
 
-func (g *GithubClient) githubRequest(method string, url string) (*http.Request, error) {
+func (g *HTTPGithubClient) githubRequest(method string, url string) (*http.Request, error) {
 	req, err := http.NewRequest(method, url, nil)
 	if err != nil {
 		return nil, err

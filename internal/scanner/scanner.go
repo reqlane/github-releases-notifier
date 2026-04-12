@@ -17,23 +17,29 @@ const (
 	defaultSleepOnEmpty   = 1 * time.Minute
 )
 
+type Scanner interface {
+	Run()
+	SetRequestsPerMin(requestsPerMin int)
+}
+
+// Github API (c)
 // Calculating points for the secondary rate limit
 // Most REST API GET, HEAD, and OPTIONS requests - 1 point
 //
 // No more than 100 concurrent requests are allowed.
 // No more than 900 points per minute are allowed for REST API endpoints.
-type Scanner struct {
-	repo           *repository.Repository
-	githubClient   *githubapi.GithubClient
-	notif          *notifier.Notifier
+type FixedRateScanner struct {
+	repo           repository.Repository
+	githubClient   githubapi.GithubClient
+	notif          notifier.Notifier
 	logger         zerolog.Logger
 	requestsPerMin int
 	sleepOnEmpty   time.Duration
 	pauseCh        chan time.Time
 }
 
-func New(r *repository.Repository, g *githubapi.GithubClient, n *notifier.Notifier, el zerolog.Logger) *Scanner {
-	return &Scanner{
+func NewFixedRateScanner(r repository.Repository, g githubapi.GithubClient, n notifier.Notifier, el zerolog.Logger) Scanner {
+	return &FixedRateScanner{
 		repo:           r,
 		githubClient:   g,
 		notif:          n,
@@ -45,17 +51,17 @@ func New(r *repository.Repository, g *githubapi.GithubClient, n *notifier.Notifi
 	}
 }
 
-func (s *Scanner) SetRequestsPerMin(requestsPerMin int) {
+func (s *FixedRateScanner) SetRequestsPerMin(requestsPerMin int) {
 	s.requestsPerMin = requestsPerMin
 }
 
-func (s *Scanner) Run() {
+func (s *FixedRateScanner) Run() {
 	for {
 		s.scan()
 	}
 }
 
-func (s *Scanner) scan() {
+func (s *FixedRateScanner) scan() {
 	// Get subscribed repos
 	repos, err := s.repo.GetSubscribedRepos()
 	if err != nil {
@@ -95,7 +101,7 @@ func (s *Scanner) scan() {
 	}
 }
 
-func (s *Scanner) checkRepo(repo model.Repo) {
+func (s *FixedRateScanner) checkRepo(repo model.Repo) {
 	tag, err := s.githubClient.GetLatestRelease(repo.Repo)
 	if err != nil && !errors.Is(err, apperror.ErrGithubRepoNoReleases) {
 		if e, ok := errors.AsType[*apperror.ErrGithubAPIRateLimited](err); ok {

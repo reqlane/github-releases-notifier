@@ -14,12 +14,12 @@ import (
 )
 
 type SubscriptionService struct {
-	repo         *repository.Repository
-	githubClient *githubapi.GithubClient
-	notif        *notifier.Notifier
+	repo         repository.Repository
+	githubClient githubapi.GithubClient
+	notif        notifier.Notifier
 }
 
-func NewSubcriptionService(r *repository.Repository, g *githubapi.GithubClient, n *notifier.Notifier) *SubscriptionService {
+func NewSubcriptionService(r repository.Repository, g githubapi.GithubClient, n notifier.Notifier) *SubscriptionService {
 	return &SubscriptionService{
 		repo:         r,
 		githubClient: g,
