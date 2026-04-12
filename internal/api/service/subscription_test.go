@@ -126,7 +126,7 @@ func TestSubscribeRepoHasNoReleasesSucceeds(t *testing.T) {
 	}
 }
 
-func TestSubscribeIfRepoNotInDBThenCreatesIt(t *testing.T) {
+func TestSubscribeRepoNotInDBCreatesIt(t *testing.T) {
 	createRepoCalled := false
 
 	repo := mock.IdealRepository()

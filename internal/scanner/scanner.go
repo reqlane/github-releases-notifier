@@ -36,6 +36,7 @@ type FixedRateScanner struct {
 	requestsPerMin int
 	sleepOnEmpty   time.Duration
 	pauseCh        chan time.Time
+	sleepFn        func(time.Duration)
 }
 
 func NewFixedRateScanner(r repository.Repository, g githubapi.GithubClient, n notifier.Notifier, el zerolog.Logger) Scanner {
@@ -48,6 +49,7 @@ func NewFixedRateScanner(r repository.Repository, g githubapi.GithubClient, n no
 		sleepOnEmpty:   defaultSleepOnEmpty,
 		// size 3 to prevent blocked "checkRepo" goroutines
 		pauseCh: make(chan time.Time, 3),
+		sleepFn: time.Sleep,
 	}
 }
 
@@ -66,12 +68,12 @@ func (s *FixedRateScanner) scan() {
 	repos, err := s.repo.GetSubscribedRepos()
 	if err != nil {
 		s.logger.Error().Err(err).Msg("error getting subscribed repos from database")
-		time.Sleep(s.sleepOnEmpty)
+		s.sleepFn(s.sleepOnEmpty)
 		return
 	}
 	if len(repos) == 0 {
 		s.logger.Info().Msg("no subscribed repos to check, scanner sleeps")
-		time.Sleep(s.sleepOnEmpty)
+		s.sleepFn(s.sleepOnEmpty)
 		return
 	}
 
@@ -91,13 +93,13 @@ func (s *FixedRateScanner) scan() {
 				}
 			}
 			s.logger.Warn().Time("reset time", resetTime).Msg("rate limit pause signal received, pausing scanner")
-			time.Sleep(time.Until(resetTime))
+			s.sleepFn(time.Until(resetTime))
 		default:
 		}
 
 		// Start checking repos in separate goroutines to maintain consistent rate
 		go s.checkRepo(repo)
-		time.Sleep(delay)
+		s.sleepFn(delay)
 	}
 }
 
