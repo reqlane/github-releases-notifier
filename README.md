@@ -112,8 +112,15 @@ Unit tests cover all business logic across two core packages `service` and `scan
 - `checkRepo` — new release updates tag and notifies all subscribers, same tag = no update and no notifications, repo with no releases at all = no update and no notifications, rate limit response sends correct pause signal to the pause channel, tag update failure = no notifications, fetching targets failure = no notifications, single notify failure does not stop remaining subscribers from being notified
 
 ```bash
-go test ./...
+go test -v ./...
 ```
+
+## CI
+
+Every push runs two jobs in parallel via GitHub Actions:
+
+- **Lint** — runs `golangci-lint` linter for code
+- **Test** — runs `go test -v ./...` all tests
 
 > I might do extras despite deadline has passed, so if you review my code after that and reckon it unfair, the last commit before deadline is
 > [f05212d](https://github.com/reqlane/github-releases-notifier/commit/f05212dc2068ada362c1a82031d948698f6ac6f8)
