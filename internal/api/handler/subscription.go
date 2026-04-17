@@ -14,8 +14,8 @@ type SubscriptionHandler struct {
 	logger  zerolog.Logger
 }
 
-func NewSubcriptionHandler(s *service.SubscriptionService, el zerolog.Logger) *SubscriptionHandler {
-	return &SubscriptionHandler{service: s, logger: el}
+func NewSubcriptionHandler(s *service.SubscriptionService, l zerolog.Logger) *SubscriptionHandler {
+	return &SubscriptionHandler{service: s, logger: l}
 }
 
 func (h *SubscriptionHandler) SubscribeHandler(w http.ResponseWriter, r *http.Request) {
@@ -24,7 +24,7 @@ func (h *SubscriptionHandler) SubscribeHandler(w http.ResponseWriter, r *http.Re
 	decoder.DisallowUnknownFields()
 	err := decoder.Decode(&subscribeRequest)
 	if err != nil {
-		sendError(w, "Invalid request body", http.StatusBadRequest)
+		h.sendError(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
@@ -34,7 +34,7 @@ func (h *SubscriptionHandler) SubscribeHandler(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	sendSuccess(w, "Subscription successful. Confirmation email sent.")
+	h.sendSuccess(w, "Subscription successful. Confirmation email sent.")
 }
 
 func (h *SubscriptionHandler) ConfirmHandler(w http.ResponseWriter, r *http.Request) {
@@ -46,7 +46,7 @@ func (h *SubscriptionHandler) ConfirmHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	sendSuccess(w, "Subscription confirmed successfully")
+	h.sendSuccess(w, "Subscription confirmed successfully")
 }
 
 func (h *SubscriptionHandler) UnsubscribeHandler(w http.ResponseWriter, r *http.Request) {
@@ -58,7 +58,7 @@ func (h *SubscriptionHandler) UnsubscribeHandler(w http.ResponseWriter, r *http.
 		return
 	}
 
-	sendSuccess(w, "Unsubscribed successfully")
+	h.sendSuccess(w, "Unsubscribed successfully")
 }
 
 func (h *SubscriptionHandler) GetSubscriptionsHandler(w http.ResponseWriter, r *http.Request) {
@@ -70,5 +70,5 @@ func (h *SubscriptionHandler) GetSubscriptionsHandler(w http.ResponseWriter, r *
 		return
 	}
 
-	sendJSON(w, http.StatusOK, subscriptions)
+	h.sendJSON(w, http.StatusOK, subscriptions)
 }

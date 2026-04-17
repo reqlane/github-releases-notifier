@@ -15,7 +15,7 @@ var (
 )
 
 func init() {
-	validate.RegisterValidation("github_repo", func(fl validator.FieldLevel) bool {
+	err := validate.RegisterValidation("github_repo", func(fl validator.FieldLevel) bool {
 		valueString := fl.Field().String()
 		parts := strings.Split(valueString, "/")
 		if len(parts) != 2 || len(parts[0]) > 39 || len(parts[1]) > 100 {
@@ -23,6 +23,9 @@ func init() {
 		}
 		return githubRepoRegex.MatchString(valueString)
 	})
+	if err != nil {
+		panic(err)
+	}
 
 	validate.RegisterTagNameFunc(func(field reflect.StructField) string {
 		jsonTag := field.Tag.Get("json")

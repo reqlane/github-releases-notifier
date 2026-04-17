@@ -39,12 +39,12 @@ type FixedRateScanner struct {
 	sleepFn        func(time.Duration)
 }
 
-func NewFixedRateScanner(r repository.Repository, g githubapi.GithubClient, n notifier.Notifier, el zerolog.Logger) Scanner {
+func NewFixedRateScanner(r repository.Repository, g githubapi.GithubClient, n notifier.Notifier, l zerolog.Logger) Scanner {
 	return &FixedRateScanner{
 		repo:           r,
 		githubClient:   g,
 		notif:          n,
-		logger:         el,
+		logger:         l,
 		requestsPerMin: defaultRequestsPerMin,
 		sleepOnEmpty:   defaultSleepOnEmpty,
 		// size 3 to prevent blocked "checkRepo" goroutines

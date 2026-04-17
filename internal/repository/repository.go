@@ -8,6 +8,7 @@ import (
 	"github.com/go-sql-driver/mysql"
 	"github.com/reqlane/github-releases-notifier/internal/apperror"
 	"github.com/reqlane/github-releases-notifier/internal/model"
+	"github.com/rs/zerolog"
 )
 
 type Repository interface {
@@ -24,11 +25,12 @@ type Repository interface {
 }
 
 type MariaDBRepository struct {
-	db *sql.DB
+	db     *sql.DB
+	logger zerolog.Logger
 }
 
-func NewMariaDBRepository(db *sql.DB) Repository {
-	return &MariaDBRepository{db: db}
+func NewMariaDBRepository(db *sql.DB, l zerolog.Logger) Repository {
+	return &MariaDBRepository{db: db, logger: l}
 }
 
 func (r *MariaDBRepository) GetSubscriptionsByEmail(email string) ([]model.Subscription, error) {
@@ -37,7 +39,11 @@ func (r *MariaDBRepository) GetSubscriptionsByEmail(email string) ([]model.Subsc
 	if err != nil {
 		return nil, fmt.Errorf("repository.GetSubscriptionsByEmail: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			r.logger.Err(err).Msg("error closing rows from db.Query")
+		}
+	}()
 
 	subscriptions := make([]model.Subscription, 0)
 	for rows.Next() {
@@ -155,7 +161,11 @@ func (r *MariaDBRepository) GetSubscribedRepos() ([]model.Repo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("repository.GetSubscribedRepos: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			r.logger.Err(err).Msg("error closing rows from db.Query")
+		}
+	}()
 
 	repos := make([]model.Repo, 0)
 	for rows.Next() {
@@ -181,7 +191,11 @@ func (r *MariaDBRepository) GetNotificationTargetsByRepo(repoID int) ([]model.No
 	if err != nil {
 		return nil, fmt.Errorf("repository.GetSubscribersByRepo: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			r.logger.Err(err).Msg("error closing rows from db.Query")
+		}
+	}()
 
 	targets := make([]model.NotificationTarget, 0)
 	for rows.Next() {

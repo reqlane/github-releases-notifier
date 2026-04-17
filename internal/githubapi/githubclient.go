@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/reqlane/github-releases-notifier/internal/apperror"
+	"github.com/rs/zerolog"
 )
 
 const githubAPIVersion = "2026-03-10"
@@ -20,13 +21,14 @@ type GithubClient interface {
 
 type HTTPGithubClient struct {
 	client       *http.Client
+	logger       zerolog.Logger
 	apiToken     string
 	blockedUntil time.Time
 	mu           sync.RWMutex
 }
 
-func NewHTTPGithubClient(client *http.Client, apiToken string) GithubClient {
-	return &HTTPGithubClient{client: client, apiToken: apiToken}
+func NewHTTPGithubClient(c *http.Client, l zerolog.Logger, t string) GithubClient {
+	return &HTTPGithubClient{client: c, logger: l, apiToken: t}
 }
 
 func (g *HTTPGithubClient) blockStatus() (bool, time.Time) {
@@ -56,7 +58,11 @@ func (g *HTTPGithubClient) RepoExists(repo string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			g.logger.Err(err).Msg("error closing response body")
+		}
+	}()
 
 	switch resp.StatusCode {
 	case http.StatusOK:
@@ -95,7 +101,11 @@ func (g *HTTPGithubClient) GetLatestRelease(repo string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			g.logger.Err(err).Msg("error closing response body")
+		}
+	}()
 
 	switch resp.StatusCode {
 	case http.StatusOK:

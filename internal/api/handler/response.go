@@ -17,20 +17,20 @@ type APIResponse struct {
 	Details map[string]string `json:"details,omitempty"`
 }
 
-func sendSuccess(w http.ResponseWriter, message string) {
+func (h *SubscriptionHandler) sendSuccess(w http.ResponseWriter, message string) {
 	response := APIResponse{
 		Status:  "success",
 		Message: message,
 	}
-	sendJSON(w, http.StatusOK, response)
+	h.sendJSON(w, http.StatusOK, response)
 }
 
-func sendError(w http.ResponseWriter, message string, code int) {
+func (h *SubscriptionHandler) sendError(w http.ResponseWriter, message string, code int) {
 	response := APIResponse{
 		Status:  "error",
 		Message: message,
 	}
-	sendJSON(w, code, response)
+	h.sendJSON(w, code, response)
 }
 
 func (h *SubscriptionHandler) sendFromAppError(w http.ResponseWriter, err error) {
@@ -76,11 +76,14 @@ func (h *SubscriptionHandler) sendFromAppError(w http.ResponseWriter, err error)
 		h.logger.Err(err).Msg("unexpected error")
 	}
 
-	sendJSON(w, code, response)
+	h.sendJSON(w, code, response)
 }
 
-func sendJSON(w http.ResponseWriter, code int, response any) {
+func (h *SubscriptionHandler) sendJSON(w http.ResponseWriter, code int, response any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(response)
+	err := json.NewEncoder(w).Encode(response)
+	if err != nil {
+		h.logger.Err(err).Msg("error encoding response")
+	}
 }

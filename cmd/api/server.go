@@ -46,7 +46,11 @@ func main() {
 		logger.Err(err).Msg("error connecting to db")
 		os.Exit(1)
 	}
-	defer dbConn.Close()
+	defer func() {
+		if err := dbConn.Close(); err != nil {
+			logger.Err(err).Msg("error closing db connection")
+		}
+	}()
 
 	// Migrations
 	err = db.RunMigrations(dbConn)
@@ -60,7 +64,7 @@ func main() {
 
 	// Dependencies
 	client := http.Client{Timeout: 10 * time.Second}
-	githubClient := githubapi.NewHTTPGithubClient(&client, githubApiToken)
+	githubClient := githubapi.NewHTTPGithubClient(&client, logger, githubApiToken)
 
 	notif := notifier.NewSMTPNotifier(notifier.SMTPNotifierConfig{
 		Host:          cfg.SMTPHost,
@@ -70,7 +74,7 @@ func main() {
 		ServerBaseURL: cfg.ServerBaseURL,
 	})
 
-	repository := repository.NewMariaDBRepository(dbConn)
+	repository := repository.NewMariaDBRepository(dbConn, logger)
 	subscriptionService := service.NewSubcriptionService(repository, githubClient, notif)
 	subscriptionHandler := handler.NewSubcriptionHandler(subscriptionService, logger)
 
