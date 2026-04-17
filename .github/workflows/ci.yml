@@ -16,7 +16,9 @@ jobs:
           go-version: "1.24.x"
 
       - name: Downgrade go version for linter
-        run: go mod edit -go=1.24
+        run: |
+          go mod edit -go=1.24
+          go mod tidy
  
       - uses: golangci/golangci-lint-action@v6
         with:
