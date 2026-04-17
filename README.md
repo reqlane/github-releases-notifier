@@ -1,5 +1,7 @@
 # github-releases-notifier
 
+![CI](https://github.com/reqlane/github-releases-notifier/actions/workflows/ci.yml/badge.svg)
+
 A REST API application that that allows users to subscribe to email notifications about new releases of a chosen Github repository.
 
 ## Workflow
