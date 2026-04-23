@@ -1,4 +1,4 @@
-package service
+package usecase
 
 import (
 	"crypto/rand"
@@ -13,21 +13,21 @@ import (
 	"github.com/reqlane/github-releases-notifier/internal/repository"
 )
 
-type SubscriptionService struct {
+type subscriptionUseCase struct {
 	repo         repository.Repository
 	githubClient githubapi.GithubClient
 	notif        notifier.Notifier
 }
 
-func NewSubcriptionService(r repository.Repository, g githubapi.GithubClient, n notifier.Notifier) *SubscriptionService {
-	return &SubscriptionService{
+func NewSubscriptionUseCase(r repository.Repository, g githubapi.GithubClient, n notifier.Notifier) SubscriptionUseCase {
+	return &subscriptionUseCase{
 		repo:         r,
 		githubClient: g,
 		notif:        n,
 	}
 }
 
-func (s *SubscriptionService) Subscribe(req *model.SubscribeRequest) error {
+func (s *subscriptionUseCase) Subscribe(req *model.SubscribeRequest) error {
 	if err := validate.Struct(req); err != nil {
 		return structValidationError(err)
 	}
@@ -96,7 +96,7 @@ func (s *SubscriptionService) Subscribe(req *model.SubscribeRequest) error {
 	return nil
 }
 
-func (s *SubscriptionService) Confirm(token string) error {
+func (s *subscriptionUseCase) Confirm(token string) error {
 	if !isValidToken(token) {
 		return &apperror.ErrInvalidResource{Resource: "Token"}
 	}
@@ -112,7 +112,7 @@ func (s *SubscriptionService) Confirm(token string) error {
 	return nil
 }
 
-func (s *SubscriptionService) Unsubscribe(token string) error {
+func (s *subscriptionUseCase) Unsubscribe(token string) error {
 	if !isValidToken(token) {
 		return &apperror.ErrInvalidResource{Resource: "Token"}
 	}
@@ -128,7 +128,7 @@ func (s *SubscriptionService) Unsubscribe(token string) error {
 	return nil
 }
 
-func (s *SubscriptionService) GetSubscriptions(email string) ([]model.Subscription, error) {
+func (s *subscriptionUseCase) GetSubscriptions(email string) ([]model.Subscription, error) {
 	if err := validate.Var(email, "email"); err != nil {
 		return nil, &apperror.ErrInvalidResource{Resource: "Email"}
 	}

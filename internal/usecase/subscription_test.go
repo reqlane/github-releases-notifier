@@ -1,4 +1,4 @@
-package service
+package usecase
 
 import (
 	"errors"
@@ -50,8 +50,8 @@ var (
 	}
 )
 
-func newService(r *mock.MockRepository, g *mock.MockGithubClient, n *mock.MockNotifier) *SubscriptionService {
-	return NewSubcriptionService(r, g, n)
+func newService(r *mock.MockRepository, g *mock.MockGithubClient, n *mock.MockNotifier) SubscriptionUseCase {
+	return NewSubscriptionUseCase(r, g, n)
 }
 
 // Subscribe tests

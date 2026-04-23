@@ -4,18 +4,18 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/reqlane/github-releases-notifier/internal/api/service"
 	"github.com/reqlane/github-releases-notifier/internal/model"
+	"github.com/reqlane/github-releases-notifier/internal/usecase"
 	"github.com/rs/zerolog"
 )
 
 type SubscriptionHandler struct {
-	service *service.SubscriptionService
+	usecase usecase.SubscriptionUseCase
 	logger  zerolog.Logger
 }
 
-func NewSubcriptionHandler(s *service.SubscriptionService, l zerolog.Logger) *SubscriptionHandler {
-	return &SubscriptionHandler{service: s, logger: l}
+func NewSubcriptionHandler(s usecase.SubscriptionUseCase, l zerolog.Logger) *SubscriptionHandler {
+	return &SubscriptionHandler{usecase: s, logger: l}
 }
 
 func (h *SubscriptionHandler) SubscribeHandler(w http.ResponseWriter, r *http.Request) {
@@ -28,7 +28,7 @@ func (h *SubscriptionHandler) SubscribeHandler(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	err = h.service.Subscribe(&subscribeRequest)
+	err = h.usecase.Subscribe(&subscribeRequest)
 	if err != nil {
 		h.sendFromAppError(w, err)
 		return
@@ -40,7 +40,7 @@ func (h *SubscriptionHandler) SubscribeHandler(w http.ResponseWriter, r *http.Re
 func (h *SubscriptionHandler) ConfirmHandler(w http.ResponseWriter, r *http.Request) {
 	token := r.PathValue("token")
 
-	err := h.service.Confirm(token)
+	err := h.usecase.Confirm(token)
 	if err != nil {
 		h.sendFromAppError(w, err)
 		return
@@ -52,7 +52,7 @@ func (h *SubscriptionHandler) ConfirmHandler(w http.ResponseWriter, r *http.Requ
 func (h *SubscriptionHandler) UnsubscribeHandler(w http.ResponseWriter, r *http.Request) {
 	token := r.PathValue("token")
 
-	err := h.service.Unsubscribe(token)
+	err := h.usecase.Unsubscribe(token)
 	if err != nil {
 		h.sendFromAppError(w, err)
 		return
@@ -64,7 +64,7 @@ func (h *SubscriptionHandler) UnsubscribeHandler(w http.ResponseWriter, r *http.
 func (h *SubscriptionHandler) GetSubscriptionsHandler(w http.ResponseWriter, r *http.Request) {
 	email := r.URL.Query().Get("email")
 
-	subscriptions, err := h.service.GetSubscriptions(email)
+	subscriptions, err := h.usecase.GetSubscriptions(email)
 	if err != nil {
 		h.sendFromAppError(w, err)
 		return
