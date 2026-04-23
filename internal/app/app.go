@@ -11,8 +11,8 @@ import (
 	"github.com/reqlane/github-releases-notifier/internal/config"
 	"github.com/reqlane/github-releases-notifier/internal/db"
 	"github.com/reqlane/github-releases-notifier/internal/githubapi"
-	"github.com/reqlane/github-releases-notifier/internal/notifier"
-	"github.com/reqlane/github-releases-notifier/internal/repository"
+	"github.com/reqlane/github-releases-notifier/internal/notifier/gomail"
+	"github.com/reqlane/github-releases-notifier/internal/repository/mariadb"
 	"github.com/reqlane/github-releases-notifier/internal/scanner"
 	"github.com/reqlane/github-releases-notifier/internal/usecase"
 	"github.com/rs/zerolog"
@@ -55,9 +55,9 @@ func Run() (err error) {
 	githubApiToken := cfg.GithubToken
 
 	client := http.Client{Timeout: 10 * time.Second}
-	githubClient := githubapi.NewHTTPGithubClient(&client, logger, githubApiToken)
+	githubClient := githubapi.NewClient(&client, logger, githubApiToken)
 
-	notif := notifier.NewSMTPNotifier(notifier.SMTPNotifierConfig{
+	notif := gomail.NewNotifier(gomail.GomailNotifierConfig{
 		Host:          cfg.SMTPHost,
 		Port:          cfg.SMTPPort,
 		Username:      cfg.SMTPUsername,
@@ -65,7 +65,7 @@ func Run() (err error) {
 		ServerBaseURL: cfg.ServerBaseURL,
 	})
 
-	repository := repository.NewMariaDBRepository(dbConn, logger)
+	repository := mariadb.NewSubscriptionRepo(dbConn, logger)
 	subscriptionUseCase := usecase.NewSubscriptionUseCase(repository, githubClient, notif)
 	subscriptionHandler := handler.NewSubcriptionHandler(subscriptionUseCase, logger)
 

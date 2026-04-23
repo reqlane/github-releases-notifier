@@ -1,22 +1,18 @@
-package notifier
+package gomail
 
 import (
 	"fmt"
 
-	gomail "gopkg.in/mail.v2"
+	"github.com/reqlane/github-releases-notifier/internal/contract"
+	gomailv2 "gopkg.in/mail.v2"
 )
 
-type Notifier interface {
-	SendConfirmation(recipient, repo, confirmToken, unsubscribeToken string) error
-	SendNotification(recipient, repo, tag, unsubscribeToken string) error
-}
-
-type SMTPNotifier struct {
-	dialer        *gomail.Dialer
+type gomailNotifier struct {
+	dialer        *gomailv2.Dialer
 	serverBaseURL string
 }
 
-type SMTPNotifierConfig struct {
+type GomailNotifierConfig struct {
 	Host          string
 	Port          int
 	Username      string
@@ -24,11 +20,11 @@ type SMTPNotifierConfig struct {
 	ServerBaseURL string
 }
 
-func NewSMTPNotifier(c SMTPNotifierConfig) Notifier {
-	return &SMTPNotifier{dialer: gomail.NewDialer(c.Host, c.Port, c.Username, c.Password), serverBaseURL: c.ServerBaseURL}
+func NewNotifier(c GomailNotifierConfig) contract.Notifier {
+	return &gomailNotifier{dialer: gomailv2.NewDialer(c.Host, c.Port, c.Username, c.Password), serverBaseURL: c.ServerBaseURL}
 }
 
-func (n *SMTPNotifier) SendConfirmation(recipient, repo, confirmToken, unsubscribeToken string) error {
+func (n *gomailNotifier) SendConfirmation(recipient, repo, confirmToken, unsubscribeToken string) error {
 	subject := fmt.Sprintf("Confirm your subscription to %s", repo)
 	repoURL := fmt.Sprintf("https://github.com/%s", repo)
 	confirmURL := fmt.Sprintf("%s/api/confirm/%s", n.serverBaseURL, confirmToken)
@@ -46,7 +42,7 @@ func (n *SMTPNotifier) SendConfirmation(recipient, repo, confirmToken, unsubscri
 	return n.sendEmail(recipient, subject, body)
 }
 
-func (n *SMTPNotifier) SendNotification(recipient, repo, tag, unsubscribeToken string) error {
+func (n *gomailNotifier) SendNotification(recipient, repo, tag, unsubscribeToken string) error {
 	subject := fmt.Sprintf("New release: %s (%s)", repo, tag)
 	repoURL := fmt.Sprintf("https://github.com/%s", repo)
 	releaseURL := fmt.Sprintf("%s/releases/tag/%s", repoURL, tag)
@@ -62,8 +58,8 @@ func (n *SMTPNotifier) SendNotification(recipient, repo, tag, unsubscribeToken s
 	return n.sendEmail(recipient, subject, body)
 }
 
-func (n *SMTPNotifier) sendEmail(recipient, subject, body string) error {
-	m := gomail.NewMessage()
+func (n *gomailNotifier) sendEmail(recipient, subject, body string) error {
+	m := gomailv2.NewMessage()
 	m.SetHeader("From", n.dialer.Username)
 	m.SetHeader("To", recipient)
 	m.SetHeader("Subject", subject)

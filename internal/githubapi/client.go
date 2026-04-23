@@ -9,17 +9,13 @@ import (
 	"time"
 
 	"github.com/reqlane/github-releases-notifier/internal/apperror"
+	"github.com/reqlane/github-releases-notifier/internal/contract"
 	"github.com/rs/zerolog"
 )
 
 const githubAPIVersion = "2026-03-10"
 
-type GithubClient interface {
-	RepoExists(repo string) error
-	GetLatestRelease(repo string) (string, error)
-}
-
-type HTTPGithubClient struct {
+type client struct {
 	client       *http.Client
 	logger       zerolog.Logger
 	apiToken     string
@@ -27,23 +23,23 @@ type HTTPGithubClient struct {
 	mu           sync.RWMutex
 }
 
-func NewHTTPGithubClient(c *http.Client, l zerolog.Logger, t string) GithubClient {
-	return &HTTPGithubClient{client: c, logger: l, apiToken: t}
+func NewClient(c *http.Client, l zerolog.Logger, apiToken string) contract.GithubClient {
+	return &client{client: c, logger: l, apiToken: apiToken}
 }
 
-func (g *HTTPGithubClient) blockStatus() (bool, time.Time) {
+func (g *client) blockStatus() (bool, time.Time) {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 	return time.Now().Before(g.blockedUntil), g.blockedUntil
 }
 
-func (g *HTTPGithubClient) blockUntil(t time.Time) {
+func (g *client) blockUntil(t time.Time) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	g.blockedUntil = t
 }
 
-func (g *HTTPGithubClient) RepoExists(repo string) error {
+func (g *client) RepoExists(repo string) error {
 	if blocked, until := g.blockStatus(); blocked {
 		return &apperror.ErrGithubAPIRateLimited{ResetTime: until}
 	}
@@ -86,7 +82,7 @@ func (g *HTTPGithubClient) RepoExists(repo string) error {
 	}
 }
 
-func (g *HTTPGithubClient) GetLatestRelease(repo string) (string, error) {
+func (g *client) GetLatestRelease(repo string) (string, error) {
 	if blocked, until := g.blockStatus(); blocked {
 		return "", &apperror.ErrGithubAPIRateLimited{ResetTime: until}
 	}
@@ -141,7 +137,7 @@ func (g *HTTPGithubClient) GetLatestRelease(repo string) (string, error) {
 // If the x-ratelimit-remaining header is 0, you should not make another request until after the time specified by the x-ratelimit-reset header.
 // The x-ratelimit-reset header is in UTC epoch seconds.
 // Otherwise, wait for at least one minute before retrying.
-func (g *HTTPGithubClient) handleRateLimit(resp *http.Response) time.Time {
+func (g *client) handleRateLimit(resp *http.Response) time.Time {
 	if retryAfter := resp.Header.Get("Retry-After"); retryAfter != "" {
 		seconds, err := strconv.ParseInt(retryAfter, 10, 64)
 		if err == nil {
@@ -165,7 +161,7 @@ func (g *HTTPGithubClient) handleRateLimit(resp *http.Response) time.Time {
 	return t
 }
 
-func (g *HTTPGithubClient) githubRequest(method string, url string) (*http.Request, error) {
+func (g *client) githubRequest(method string, url string) (*http.Request, error) {
 	req, err := http.NewRequest(method, url, nil)
 	if err != nil {
 		return nil, err

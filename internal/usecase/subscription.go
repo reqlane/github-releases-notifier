@@ -7,19 +7,17 @@ import (
 	"fmt"
 
 	"github.com/reqlane/github-releases-notifier/internal/apperror"
-	"github.com/reqlane/github-releases-notifier/internal/githubapi"
+	"github.com/reqlane/github-releases-notifier/internal/contract"
 	"github.com/reqlane/github-releases-notifier/internal/model"
-	"github.com/reqlane/github-releases-notifier/internal/notifier"
-	"github.com/reqlane/github-releases-notifier/internal/repository"
 )
 
 type subscriptionUseCase struct {
-	repo         repository.Repository
-	githubClient githubapi.GithubClient
-	notif        notifier.Notifier
+	repo         contract.SubscriptionRepo
+	githubClient contract.GithubClient
+	notif        contract.Notifier
 }
 
-func NewSubscriptionUseCase(r repository.Repository, g githubapi.GithubClient, n notifier.Notifier) SubscriptionUseCase {
+func NewSubscriptionUseCase(r contract.SubscriptionRepo, g contract.GithubClient, n contract.Notifier) SubscriptionUseCase {
 	return &subscriptionUseCase{
 		repo:         r,
 		githubClient: g,

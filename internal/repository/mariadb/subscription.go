@@ -1,4 +1,4 @@
-package repository
+package mariadb
 
 import (
 	"database/sql"
@@ -7,33 +7,21 @@ import (
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/reqlane/github-releases-notifier/internal/apperror"
+	"github.com/reqlane/github-releases-notifier/internal/contract"
 	"github.com/reqlane/github-releases-notifier/internal/model"
 	"github.com/rs/zerolog"
 )
 
-type Repository interface {
-	GetSubscriptionsByEmail(email string) ([]model.Subscription, error)
-	CreateSubscription(email string, repoID int, confirmToken, unsubscribeToken string) error
-	SubscriptionExists(email string, repoName string) (bool, error)
-	ConfirmSubscription(confirmToken string) error
-	DeleteSubscription(unsubscribeToken string) error
-	GetRepoByName(repoName string) (model.Repo, error)
-	CreateRepo(repo model.Repo) (model.Repo, error)
-	GetSubscribedRepos() ([]model.Repo, error)
-	GetNotificationTargetsByRepo(repoID int) ([]model.NotificationTarget, error)
-	UpdateLastSeenTag(repoID int, tag string) error
-}
-
-type MariaDBRepository struct {
+type mariadbSubscriptionRepo struct {
 	db     *sql.DB
 	logger zerolog.Logger
 }
 
-func NewMariaDBRepository(db *sql.DB, l zerolog.Logger) Repository {
-	return &MariaDBRepository{db: db, logger: l}
+func NewSubscriptionRepo(db *sql.DB, l zerolog.Logger) contract.SubscriptionRepo {
+	return &mariadbSubscriptionRepo{db: db, logger: l}
 }
 
-func (r *MariaDBRepository) GetSubscriptionsByEmail(email string) ([]model.Subscription, error) {
+func (r *mariadbSubscriptionRepo) GetSubscriptionsByEmail(email string) ([]model.Subscription, error) {
 	query := `SELECT s.email, r.repo, s.confirmed, r.last_seen_tag FROM subscriptions s JOIN repos r ON s.repo_id = r.id WHERE email=?`
 	rows, err := r.db.Query(query, email)
 	if err != nil {
@@ -63,7 +51,7 @@ func (r *MariaDBRepository) GetSubscriptionsByEmail(email string) ([]model.Subsc
 	return subscriptions, nil
 }
 
-func (r *MariaDBRepository) CreateSubscription(email string, repoID int, confirmToken, unsubscribeToken string) error {
+func (r *mariadbSubscriptionRepo) CreateSubscription(email string, repoID int, confirmToken, unsubscribeToken string) error {
 	query := `INSERT INTO subscriptions (email, repo_id, confirm_token, unsubscribe_token) VALUES (?,?,?,?)`
 	_, err := r.db.Exec(query, email, repoID, confirmToken, unsubscribeToken)
 	if err != nil {
@@ -72,7 +60,7 @@ func (r *MariaDBRepository) CreateSubscription(email string, repoID int, confirm
 	return nil
 }
 
-func (r *MariaDBRepository) SubscriptionExists(email string, repoName string) (bool, error) {
+func (r *mariadbSubscriptionRepo) SubscriptionExists(email string, repoName string) (bool, error) {
 	query := `SELECT EXISTS(SELECT 1 FROM subscriptions s JOIN repos r ON s.repo_id = r.id WHERE s.email=? AND r.repo=?)`
 	var exists bool
 	err := r.db.QueryRow(query, email, repoName).Scan(&exists)
@@ -82,7 +70,7 @@ func (r *MariaDBRepository) SubscriptionExists(email string, repoName string) (b
 	return exists, nil
 }
 
-func (r *MariaDBRepository) ConfirmSubscription(confirmToken string) error {
+func (r *mariadbSubscriptionRepo) ConfirmSubscription(confirmToken string) error {
 	query := `UPDATE subscriptions SET confirmed=true, confirm_token=NULL WHERE confirm_token=?`
 	res, err := r.db.Exec(query, confirmToken)
 	if err != nil {
@@ -100,7 +88,7 @@ func (r *MariaDBRepository) ConfirmSubscription(confirmToken string) error {
 	return nil
 }
 
-func (r *MariaDBRepository) DeleteSubscription(unsubscribeToken string) error {
+func (r *mariadbSubscriptionRepo) DeleteSubscription(unsubscribeToken string) error {
 	query := `DELETE FROM subscriptions WHERE unsubscribe_token=?`
 	res, err := r.db.Exec(query, unsubscribeToken)
 	if err != nil {
@@ -118,7 +106,7 @@ func (r *MariaDBRepository) DeleteSubscription(unsubscribeToken string) error {
 	return nil
 }
 
-func (r *MariaDBRepository) GetRepoByName(repoName string) (model.Repo, error) {
+func (r *mariadbSubscriptionRepo) GetRepoByName(repoName string) (model.Repo, error) {
 	query := `SELECT id, repo, last_seen_tag FROM repos WHERE repo=?`
 	var repo model.Repo
 
@@ -133,7 +121,7 @@ func (r *MariaDBRepository) GetRepoByName(repoName string) (model.Repo, error) {
 	return repo, nil
 }
 
-func (r *MariaDBRepository) CreateRepo(repo model.Repo) (model.Repo, error) {
+func (r *mariadbSubscriptionRepo) CreateRepo(repo model.Repo) (model.Repo, error) {
 	query := `INSERT INTO repos (repo, last_seen_tag) VALUES (?,?)`
 
 	result, err := r.db.Exec(query, repo.Repo, repo.LastSeenTag)
@@ -155,7 +143,7 @@ func (r *MariaDBRepository) CreateRepo(repo model.Repo) (model.Repo, error) {
 	return repo, nil
 }
 
-func (r *MariaDBRepository) GetSubscribedRepos() ([]model.Repo, error) {
+func (r *mariadbSubscriptionRepo) GetSubscribedRepos() ([]model.Repo, error) {
 	query := `SELECT id, repo, last_seen_tag FROM repos WHERE EXISTS (SELECT 1 FROM subscriptions WHERE repo_id=repos.id AND confirmed=true)`
 	rows, err := r.db.Query(query)
 	if err != nil {
@@ -185,7 +173,7 @@ func (r *MariaDBRepository) GetSubscribedRepos() ([]model.Repo, error) {
 	return repos, nil
 }
 
-func (r *MariaDBRepository) GetNotificationTargetsByRepo(repoID int) ([]model.NotificationTarget, error) {
+func (r *mariadbSubscriptionRepo) GetNotificationTargetsByRepo(repoID int) ([]model.NotificationTarget, error) {
 	query := `SELECT email, unsubscribe_token FROM subscribers WHERE repo_id=? AND confirmed=true`
 	rows, err := r.db.Query(query, repoID)
 	if err != nil {
@@ -215,7 +203,7 @@ func (r *MariaDBRepository) GetNotificationTargetsByRepo(repoID int) ([]model.No
 	return targets, nil
 }
 
-func (r *MariaDBRepository) UpdateLastSeenTag(repoID int, tag string) error {
+func (r *mariadbSubscriptionRepo) UpdateLastSeenTag(repoID int, tag string) error {
 	query := `UPDATE repos SET last_seen_tag=? WHERE id=?`
 	_, err := r.db.Exec(query, tag, repoID)
 	if err != nil {

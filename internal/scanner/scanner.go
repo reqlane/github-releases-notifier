@@ -5,10 +5,8 @@ import (
 	"time"
 
 	"github.com/reqlane/github-releases-notifier/internal/apperror"
-	"github.com/reqlane/github-releases-notifier/internal/githubapi"
+	"github.com/reqlane/github-releases-notifier/internal/contract"
 	"github.com/reqlane/github-releases-notifier/internal/model"
-	"github.com/reqlane/github-releases-notifier/internal/notifier"
-	"github.com/reqlane/github-releases-notifier/internal/repository"
 	"github.com/rs/zerolog"
 )
 
@@ -17,21 +15,16 @@ const (
 	defaultSleepOnEmpty   = 1 * time.Minute
 )
 
-type Scanner interface {
-	Run()
-	SetRequestsPerMin(requestsPerMin int)
-}
-
 // Github API (c)
 // Calculating points for the secondary rate limit
 // Most REST API GET, HEAD, and OPTIONS requests - 1 point
 //
 // No more than 100 concurrent requests are allowed.
 // No more than 900 points per minute are allowed for REST API endpoints.
-type FixedRateScanner struct {
-	repo           repository.Repository
-	githubClient   githubapi.GithubClient
-	notif          notifier.Notifier
+type fixedRateScanner struct {
+	repo           contract.SubscriptionRepo
+	githubClient   contract.GithubClient
+	notif          contract.Notifier
 	logger         zerolog.Logger
 	requestsPerMin int
 	sleepOnEmpty   time.Duration
@@ -39,8 +32,8 @@ type FixedRateScanner struct {
 	sleepFn        func(time.Duration)
 }
 
-func NewFixedRateScanner(r repository.Repository, g githubapi.GithubClient, n notifier.Notifier, l zerolog.Logger) Scanner {
-	return &FixedRateScanner{
+func NewFixedRateScanner(r contract.SubscriptionRepo, g contract.GithubClient, n contract.Notifier, l zerolog.Logger) *fixedRateScanner {
+	return &fixedRateScanner{
 		repo:           r,
 		githubClient:   g,
 		notif:          n,
@@ -53,17 +46,17 @@ func NewFixedRateScanner(r repository.Repository, g githubapi.GithubClient, n no
 	}
 }
 
-func (s *FixedRateScanner) SetRequestsPerMin(requestsPerMin int) {
+func (s *fixedRateScanner) SetRequestsPerMin(requestsPerMin int) {
 	s.requestsPerMin = requestsPerMin
 }
 
-func (s *FixedRateScanner) Run() {
+func (s *fixedRateScanner) Run() {
 	for {
 		s.scan()
 	}
 }
 
-func (s *FixedRateScanner) scan() {
+func (s *fixedRateScanner) scan() {
 	// Get subscribed repos
 	repos, err := s.repo.GetSubscribedRepos()
 	if err != nil {
@@ -103,7 +96,7 @@ func (s *FixedRateScanner) scan() {
 	}
 }
 
-func (s *FixedRateScanner) checkRepo(repo model.Repo) {
+func (s *fixedRateScanner) checkRepo(repo model.Repo) {
 	tag, err := s.githubClient.GetLatestRelease(repo.Repo)
 	if err != nil && !errors.Is(err, apperror.ErrGithubRepoNoReleases) {
 		if e, ok := errors.AsType[*apperror.ErrGithubAPIRateLimited](err); ok {
