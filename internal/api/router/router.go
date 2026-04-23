@@ -6,21 +6,21 @@ import (
 	"github.com/reqlane/github-releases-notifier/internal/api/handler"
 )
 
-type app struct {
+type Router struct {
 	subscriptionHandler *handler.SubscriptionHandler
 }
 
-func NewApp(h *handler.SubscriptionHandler) *app {
-	return &app{
+func NewRouter(h *handler.SubscriptionHandler) *Router {
+	return &Router{
 		subscriptionHandler: h,
 	}
 }
 
-func (a *app) Router() *http.ServeMux {
+func (r *Router) Build() *http.ServeMux {
 	mux := http.NewServeMux()
 
 	apiMux := http.NewServeMux()
-	a.subscriptionRouter(apiMux)
+	r.subscriptionRouter(apiMux)
 
 	mux.Handle("/api/", http.StripPrefix("/api", apiMux))
 
