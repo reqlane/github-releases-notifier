@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/reqlane/github-releases-notifier/internal/model"
+	"github.com/reqlane/github-releases-notifier/internal/api/handler/dto"
 	"github.com/reqlane/github-releases-notifier/internal/usecase"
 	"github.com/rs/zerolog"
 )
@@ -19,16 +19,16 @@ func NewSubcriptionHandler(s usecase.SubscriptionUseCase, l zerolog.Logger) *Sub
 }
 
 func (h *SubscriptionHandler) SubscribeHandler(w http.ResponseWriter, r *http.Request) {
-	var subscribeRequest model.SubscribeRequest
+	var req dto.SubscribeRequest
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
-	err := decoder.Decode(&subscribeRequest)
+	err := decoder.Decode(&req)
 	if err != nil {
 		h.sendError(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	err = h.usecase.Subscribe(&subscribeRequest)
+	err = h.usecase.Subscribe(&usecase.SubscribeInput{Email: req.Email, Repo: req.Repo})
 	if err != nil {
 		h.sendFromAppError(w, err)
 		return

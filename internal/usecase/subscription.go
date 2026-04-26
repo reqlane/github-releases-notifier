@@ -25,13 +25,13 @@ func NewSubscriptionUseCase(r contract.SubscriptionRepo, g contract.GithubClient
 	}
 }
 
-func (s *subscriptionUseCase) Subscribe(req *model.SubscribeRequest) error {
-	if err := validate.Struct(req); err != nil {
+func (s *subscriptionUseCase) Subscribe(input *SubscribeInput) error {
+	if err := validate.Struct(input); err != nil {
 		return structValidationError(err)
 	}
 
 	// Check if email already subscribed on repo
-	exists, err := s.repo.SubscriptionExists(req.Email, req.Repo)
+	exists, err := s.repo.SubscriptionExists(input.Email, input.Repo)
 	if err != nil {
 		return fmt.Errorf("service.Subscribe: %w", err)
 	}
@@ -40,28 +40,28 @@ func (s *subscriptionUseCase) Subscribe(req *model.SubscribeRequest) error {
 	}
 
 	// Check repo existence
-	err = s.githubClient.RepoExists(req.Repo)
+	err = s.githubClient.RepoExists(input.Repo)
 	if err != nil {
 		return fmt.Errorf("service.Subscribe: %w", err)
 	}
 
 	// Get latest release
-	lastSeenTag, err := s.githubClient.GetLatestRelease(req.Repo)
+	lastSeenTag, err := s.githubClient.GetLatestRelease(input.Repo)
 	if err != nil && !errors.Is(err, apperror.ErrGithubRepoNoReleases) {
 		return fmt.Errorf("service.Subscribe: %w", err)
 	}
 
 	// Create repo record if not tracked yet
-	repo, err := s.repo.GetRepoByName(req.Repo)
+	trackedRepo, err := s.repo.GetRepoByName(input.Repo)
 	if err != nil && !errors.Is(err, apperror.ErrNotFound) {
 		return fmt.Errorf("service.Subscribe: %w", err)
 	}
 	if errors.Is(err, apperror.ErrNotFound) {
-		repo, err = s.repo.CreateRepo(model.Repo{Repo: req.Repo, LastSeenTag: lastSeenTag})
+		trackedRepo, err = s.repo.CreateRepo(model.Repo{Repo: input.Repo, LastSeenTag: lastSeenTag})
 		if err != nil {
 			// possible race condition
 			if errors.Is(err, apperror.ErrAlreadyExists) {
-				repo, err = s.repo.GetRepoByName(req.Repo)
+				trackedRepo, err = s.repo.GetRepoByName(input.Repo)
 				if err != nil {
 					return fmt.Errorf("service.Subscribe: %w", err)
 				}
@@ -80,13 +80,13 @@ func (s *subscriptionUseCase) Subscribe(req *model.SubscribeRequest) error {
 	if err != nil {
 		return fmt.Errorf("service.Subscribe: %w", err)
 	}
-	err = s.repo.CreateSubscription(req.Email, repo.ID, confirmToken, unsubscribeToken)
+	err = s.repo.CreateSubscription(input.Email, trackedRepo.ID, confirmToken, unsubscribeToken)
 	if err != nil {
 		return fmt.Errorf("service.Subscribe: %w", err)
 	}
 
 	// Send confirmation email
-	err = s.notif.SendConfirmation(req.Email, req.Repo, confirmToken, unsubscribeToken)
+	err = s.notif.SendConfirmation(input.Email, input.Repo, confirmToken, unsubscribeToken)
 	if err != nil {
 		return fmt.Errorf("service.Subscribe: %w", err)
 	}

@@ -57,7 +57,7 @@ func newService(r *mock.MockRepository, g *mock.MockGithubClient, n *mock.MockNo
 // Subscribe tests
 func TestSubscribeSuccess(t *testing.T) {
 	svc := newService(mock.IdealRepository(), mock.IdealGithubClient(), mock.IdealNotifier())
-	err := svc.Subscribe(&model.SubscribeRequest{Email: "user@example.com", Repo: "owner/repo"})
+	err := svc.Subscribe(&SubscribeInput{Email: "user@example.com", Repo: "owner/repo"})
 	if err != nil {
 		t.Errorf("expected no error, got: %v", err)
 	}
@@ -68,7 +68,7 @@ func TestSubscribeInvalidEmail(t *testing.T) {
 
 	for _, tt := range invalidEmails {
 		t.Run(tt.name, func(t *testing.T) {
-			err := svc.Subscribe(&model.SubscribeRequest{Email: "not-an-email", Repo: "owner/repo"})
+			err := svc.Subscribe(&SubscribeInput{Email: "not-an-email", Repo: "owner/repo"})
 			if _, ok := errors.AsType[*apperror.ErrValidation](err); !ok {
 				t.Errorf("expected *ErrValidation, got: %T", err)
 			}
@@ -81,7 +81,7 @@ func TestSubscribeInvalidRepo(t *testing.T) {
 
 	for _, tt := range invalidRepos {
 		t.Run(tt.name, func(t *testing.T) {
-			err := svc.Subscribe(&model.SubscribeRequest{Email: "user@example.com", Repo: tt.repo})
+			err := svc.Subscribe(&SubscribeInput{Email: "user@example.com", Repo: tt.repo})
 			if _, ok := errors.AsType[*apperror.ErrValidation](err); !ok {
 				t.Errorf("expected *ErrValidation for %s, got: %T", tt.repo, err)
 			}
@@ -94,7 +94,7 @@ func TestSubscribeSubscriptionAlreadyExists(t *testing.T) {
 	repo.SubscriptionExistsFunc = func(email string, repoName string) (bool, error) { return true, nil }
 
 	svc := newService(repo, mock.IdealGithubClient(), mock.IdealNotifier())
-	err := svc.Subscribe(&model.SubscribeRequest{Email: "user@example.com", Repo: "owner/repo"})
+	err := svc.Subscribe(&SubscribeInput{Email: "user@example.com", Repo: "owner/repo"})
 	if !errors.Is(err, apperror.ErrSubscriptionAlreadyExists) {
 		t.Errorf("expected ErrSubscriptionAlreadyExists, got: %v", err)
 	}
@@ -107,7 +107,7 @@ func TestSubscribeRepoNotFoundOnGithub(t *testing.T) {
 	}
 
 	svc := newService(mock.IdealRepository(), githubClient, mock.IdealNotifier())
-	err := svc.Subscribe(&model.SubscribeRequest{Email: "user@example.com", Repo: "owner/repo"})
+	err := svc.Subscribe(&SubscribeInput{Email: "user@example.com", Repo: "owner/repo"})
 	if _, ok := errors.AsType[*apperror.ErrResourceNotFound](err); !ok {
 		t.Errorf("expected *ErrResourceNotFound, got: %T", err)
 	}
@@ -120,7 +120,7 @@ func TestSubscribeRepoHasNoReleasesSucceeds(t *testing.T) {
 	}
 
 	svc := newService(mock.IdealRepository(), githubClient, mock.IdealNotifier())
-	err := svc.Subscribe(&model.SubscribeRequest{Email: "user@example.com", Repo: "owner/repo"})
+	err := svc.Subscribe(&SubscribeInput{Email: "user@example.com", Repo: "owner/repo"})
 	if err != nil {
 		t.Errorf("expected no error for repo with no releases, got: %v", err)
 	}
@@ -139,7 +139,7 @@ func TestSubscribeRepoNotInDBCreatesIt(t *testing.T) {
 	}
 
 	svc := newService(repo, mock.IdealGithubClient(), mock.IdealNotifier())
-	err := svc.Subscribe(&model.SubscribeRequest{Email: "user@example.com", Repo: "owner/repo"})
+	err := svc.Subscribe(&SubscribeInput{Email: "user@example.com", Repo: "owner/repo"})
 	if err != nil {
 		t.Errorf("expected no error, got: %v", err)
 	}
@@ -164,7 +164,7 @@ func TestSubscribeRepoRaceConditionFallsBackToGet(t *testing.T) {
 	}
 
 	svc := newService(repo, mock.IdealGithubClient(), mock.IdealNotifier())
-	err := svc.Subscribe(&model.SubscribeRequest{Email: "user@example.com", Repo: "owner/repo"})
+	err := svc.Subscribe(&SubscribeInput{Email: "user@example.com", Repo: "owner/repo"})
 	if err != nil {
 		t.Errorf("expected no error on race condition fallback, got: %v", err)
 	}
@@ -180,7 +180,7 @@ func TestSubscribeConfirmationEmailFails(t *testing.T) {
 	}
 
 	svc := newService(mock.IdealRepository(), mock.IdealGithubClient(), notif)
-	err := svc.Subscribe(&model.SubscribeRequest{Email: "user@example.com", Repo: "owner/repo"})
+	err := svc.Subscribe(&SubscribeInput{Email: "user@example.com", Repo: "owner/repo"})
 	if err == nil {
 		t.Error("expected error when email fails, got nil")
 	}
