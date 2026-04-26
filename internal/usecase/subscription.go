@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
-	"fmt"
 
 	"github.com/reqlane/github-releases-notifier/internal/apperror"
 	"github.com/reqlane/github-releases-notifier/internal/contract"
@@ -33,7 +32,7 @@ func (s *subscriptionUseCase) Subscribe(input *SubscribeInput) error {
 	// Check if email already subscribed on repo
 	exists, err := s.repo.SubscriptionExists(input.Email, input.Repo)
 	if err != nil {
-		return fmt.Errorf("service.Subscribe: %w", err)
+		return err
 	}
 	if exists {
 		return apperror.ErrSubscriptionAlreadyExists
@@ -42,19 +41,19 @@ func (s *subscriptionUseCase) Subscribe(input *SubscribeInput) error {
 	// Check repo existence
 	err = s.githubClient.RepoExists(input.Repo)
 	if err != nil {
-		return fmt.Errorf("service.Subscribe: %w", err)
+		return err
 	}
 
 	// Get latest release
 	lastSeenTag, err := s.githubClient.GetLatestRelease(input.Repo)
 	if err != nil && !errors.Is(err, apperror.ErrGithubRepoNoReleases) {
-		return fmt.Errorf("service.Subscribe: %w", err)
+		return err
 	}
 
 	// Create repo record if not tracked yet
 	trackedRepo, err := s.repo.GetRepoByName(input.Repo)
 	if err != nil && !errors.Is(err, apperror.ErrNotFound) {
-		return fmt.Errorf("service.Subscribe: %w", err)
+		return err
 	}
 	if errors.Is(err, apperror.ErrNotFound) {
 		trackedRepo, err = s.repo.CreateRepo(model.Repo{Repo: input.Repo, LastSeenTag: lastSeenTag})
@@ -63,10 +62,10 @@ func (s *subscriptionUseCase) Subscribe(input *SubscribeInput) error {
 			if errors.Is(err, apperror.ErrAlreadyExists) {
 				trackedRepo, err = s.repo.GetRepoByName(input.Repo)
 				if err != nil {
-					return fmt.Errorf("service.Subscribe: %w", err)
+					return err
 				}
 			} else {
-				return fmt.Errorf("service.Subscribe: %w", err)
+				return err
 			}
 		}
 	}
@@ -74,21 +73,21 @@ func (s *subscriptionUseCase) Subscribe(input *SubscribeInput) error {
 	// Create subscription
 	confirmToken, err := generateToken()
 	if err != nil {
-		return fmt.Errorf("service.Subscribe: %w", err)
+		return err
 	}
 	unsubscribeToken, err := generateToken()
 	if err != nil {
-		return fmt.Errorf("service.Subscribe: %w", err)
+		return err
 	}
 	err = s.repo.CreateSubscription(input.Email, trackedRepo.ID, confirmToken, unsubscribeToken)
 	if err != nil {
-		return fmt.Errorf("service.Subscribe: %w", err)
+		return err
 	}
 
 	// Send confirmation email
 	err = s.notif.SendConfirmation(input.Email, input.Repo, confirmToken, unsubscribeToken)
 	if err != nil {
-		return fmt.Errorf("service.Subscribe: %w", err)
+		return err
 	}
 
 	return nil
@@ -104,7 +103,7 @@ func (s *subscriptionUseCase) Confirm(token string) error {
 		if errors.Is(err, apperror.ErrNotFound) {
 			return &apperror.ErrResourceNotFound{Resource: "Token"}
 		}
-		return fmt.Errorf("service.Confirm: %w", err)
+		return err
 	}
 
 	return nil
@@ -120,7 +119,7 @@ func (s *subscriptionUseCase) Unsubscribe(token string) error {
 		if errors.Is(err, apperror.ErrNotFound) {
 			return &apperror.ErrResourceNotFound{Resource: "Token"}
 		}
-		return fmt.Errorf("service.Unsubscribe: %w", err)
+		return err
 	}
 
 	return nil
@@ -133,7 +132,7 @@ func (s *subscriptionUseCase) GetSubscriptions(email string) ([]model.Subscripti
 
 	subscriptions, err := s.repo.GetSubscriptionsByEmail(email)
 	if err != nil {
-		return nil, fmt.Errorf("service.GetSubscriptions: %w", err)
+		return nil, err
 	}
 
 	return subscriptions, nil

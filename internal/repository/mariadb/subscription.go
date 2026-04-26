@@ -3,7 +3,6 @@ package mariadb
 import (
 	"database/sql"
 	"errors"
-	"fmt"
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/reqlane/github-releases-notifier/internal/apperror"
@@ -25,7 +24,7 @@ func (r *mariadbSubscriptionRepo) GetSubscriptionsByEmail(email string) ([]model
 	query := `SELECT s.email, r.repo, s.confirmed, r.last_seen_tag FROM subscriptions s JOIN repos r ON s.repo_id = r.id WHERE email=?`
 	rows, err := r.db.Query(query, email)
 	if err != nil {
-		return nil, fmt.Errorf("repository.GetSubscriptionsByEmail: %w", err)
+		return nil, err
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
@@ -38,14 +37,14 @@ func (r *mariadbSubscriptionRepo) GetSubscriptionsByEmail(email string) ([]model
 		var subscription model.Subscription
 		err = rows.Scan(&subscription.Email, &subscription.Repo, &subscription.Confirmed, &subscription.LastSeenTag)
 		if err != nil {
-			return nil, fmt.Errorf("repository.GetSubscriptionsByEmail: %w", err)
+			return nil, err
 		}
 		subscriptions = append(subscriptions, subscription)
 	}
 
 	err = rows.Err()
 	if err != nil {
-		return nil, fmt.Errorf("repository.GetSubscriptionsByEmail: %w", err)
+		return nil, err
 	}
 
 	return subscriptions, nil
@@ -55,7 +54,7 @@ func (r *mariadbSubscriptionRepo) CreateSubscription(email string, repoID int, c
 	query := `INSERT INTO subscriptions (email, repo_id, confirm_token, unsubscribe_token) VALUES (?,?,?,?)`
 	_, err := r.db.Exec(query, email, repoID, confirmToken, unsubscribeToken)
 	if err != nil {
-		return fmt.Errorf("repository.CreateSubscription: %w", err)
+		return err
 	}
 	return nil
 }
@@ -65,7 +64,7 @@ func (r *mariadbSubscriptionRepo) SubscriptionExists(email string, repoName stri
 	var exists bool
 	err := r.db.QueryRow(query, email, repoName).Scan(&exists)
 	if err != nil {
-		return false, fmt.Errorf("repository.SubscriptionExists: %w", err)
+		return false, err
 	}
 	return exists, nil
 }
@@ -74,12 +73,12 @@ func (r *mariadbSubscriptionRepo) ConfirmSubscription(confirmToken string) error
 	query := `UPDATE subscriptions SET confirmed=true, confirm_token=NULL WHERE confirm_token=?`
 	res, err := r.db.Exec(query, confirmToken)
 	if err != nil {
-		return fmt.Errorf("repository.ConfirmSubscription: %w", err)
+		return err
 	}
 
 	rowsAffected, err := res.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("repository.ConfirmSubscription: %w", err)
+		return err
 	}
 	if rowsAffected == 0 {
 		return apperror.ErrNotFound
@@ -92,12 +91,12 @@ func (r *mariadbSubscriptionRepo) DeleteSubscription(unsubscribeToken string) er
 	query := `DELETE FROM subscriptions WHERE unsubscribe_token=?`
 	res, err := r.db.Exec(query, unsubscribeToken)
 	if err != nil {
-		return fmt.Errorf("repository.DeleteSubscription: %w", err)
+		return err
 	}
 
 	rowsAffected, err := res.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("repository.DeleteSubscription: %w", err)
+		return err
 	}
 	if rowsAffected == 0 {
 		return apperror.ErrNotFound
@@ -115,7 +114,7 @@ func (r *mariadbSubscriptionRepo) GetRepoByName(repoName string) (model.Repo, er
 		if errors.Is(err, sql.ErrNoRows) {
 			return model.Repo{}, apperror.ErrNotFound
 		}
-		return model.Repo{}, fmt.Errorf("repository.GetRepoByName: %w", err)
+		return model.Repo{}, err
 	}
 
 	return repo, nil
@@ -131,12 +130,12 @@ func (r *mariadbSubscriptionRepo) CreateRepo(repo model.Repo) (model.Repo, error
 				return model.Repo{}, apperror.ErrAlreadyExists
 			}
 		}
-		return model.Repo{}, fmt.Errorf("repository.CreateRepo: %w", err)
+		return model.Repo{}, err
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
-		return model.Repo{}, fmt.Errorf("repository.CreateRepo: %w", err)
+		return model.Repo{}, err
 	}
 
 	repo.ID = int(id)
@@ -147,7 +146,7 @@ func (r *mariadbSubscriptionRepo) GetSubscribedRepos() ([]model.Repo, error) {
 	query := `SELECT id, repo, last_seen_tag FROM repos WHERE EXISTS (SELECT 1 FROM subscriptions WHERE repo_id=repos.id AND confirmed=true)`
 	rows, err := r.db.Query(query)
 	if err != nil {
-		return nil, fmt.Errorf("repository.GetSubscribedRepos: %w", err)
+		return nil, err
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
@@ -160,14 +159,14 @@ func (r *mariadbSubscriptionRepo) GetSubscribedRepos() ([]model.Repo, error) {
 		var repo model.Repo
 		err = rows.Scan(&repo.ID, &repo.Repo, &repo.LastSeenTag)
 		if err != nil {
-			return nil, fmt.Errorf("repository.GetSubscribedRepos: %w", err)
+			return nil, err
 		}
 		repos = append(repos, repo)
 	}
 
 	err = rows.Err()
 	if err != nil {
-		return nil, fmt.Errorf("repository.GetSubscribedRepos: %w", err)
+		return nil, err
 	}
 
 	return repos, nil
@@ -177,7 +176,7 @@ func (r *mariadbSubscriptionRepo) GetNotificationTargetsByRepo(repoID int) ([]mo
 	query := `SELECT email, unsubscribe_token FROM subscribers WHERE repo_id=? AND confirmed=true`
 	rows, err := r.db.Query(query, repoID)
 	if err != nil {
-		return nil, fmt.Errorf("repository.GetSubscribersByRepo: %w", err)
+		return nil, err
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
@@ -190,14 +189,14 @@ func (r *mariadbSubscriptionRepo) GetNotificationTargetsByRepo(repoID int) ([]mo
 		var target model.NotificationTarget
 		err = rows.Scan(&target.Email, &target.UnsubscribeToken)
 		if err != nil {
-			return nil, fmt.Errorf("repository.GetSubscribersByRepo: %w", err)
+			return nil, err
 		}
 		targets = append(targets, target)
 	}
 
 	err = rows.Err()
 	if err != nil {
-		return nil, fmt.Errorf("repository.GetSubscribersByRepo: %w", err)
+		return nil, err
 	}
 
 	return targets, nil
@@ -207,7 +206,7 @@ func (r *mariadbSubscriptionRepo) UpdateLastSeenTag(repoID int, tag string) erro
 	query := `UPDATE repos SET last_seen_tag=? WHERE id=?`
 	_, err := r.db.Exec(query, tag, repoID)
 	if err != nil {
-		return fmt.Errorf("repository.UpdateLastSeenTag: %w", err)
+		return err
 	}
 	return nil
 }
