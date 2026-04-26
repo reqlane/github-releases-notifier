@@ -1,9 +1,9 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/http"
 
+	"github.com/gin-gonic/gin"
 	"github.com/reqlane/github-releases-notifier/internal/api/handler/dto"
 	"github.com/reqlane/github-releases-notifier/internal/usecase"
 	"github.com/rs/zerolog"
@@ -18,57 +18,67 @@ func NewSubcriptionHandler(s usecase.SubscriptionUseCase, l zerolog.Logger) *Sub
 	return &SubscriptionHandler{usecase: s, logger: l}
 }
 
-func (h *SubscriptionHandler) SubscribeHandler(w http.ResponseWriter, r *http.Request) {
-	var req dto.SubscribeRequest
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	err := decoder.Decode(&req)
+func (h *SubscriptionHandler) SubscribeHandler(c *gin.Context) {
+	var input dto.SubscribeRequest
+	err := c.ShouldBindJSON(&input)
 	if err != nil {
-		h.sendError(w, "Invalid request body", http.StatusBadRequest)
+		c.JSON(http.StatusBadRequest, APIResponse{
+			Status:  "error",
+			Message: "Invalid request body",
+		})
 		return
 	}
 
-	err = h.usecase.Subscribe(&usecase.SubscribeInput{Email: req.Email, Repo: req.Repo})
+	err = h.usecase.Subscribe(&usecase.SubscribeInput{Email: input.Email, Repo: input.Repo})
 	if err != nil {
-		h.sendFromAppError(w, err)
+		h.sendFromAppError(c, err)
 		return
 	}
 
-	h.sendSuccess(w, "Subscription successful. Confirmation email sent.")
+	c.JSON(http.StatusOK, APIResponse{
+		Status:  "success",
+		Message: "Subscription successful. Confirmation email sent.",
+	})
 }
 
-func (h *SubscriptionHandler) ConfirmHandler(w http.ResponseWriter, r *http.Request) {
-	token := r.PathValue("token")
+func (h *SubscriptionHandler) ConfirmHandler(c *gin.Context) {
+	token := c.Param("token")
 
 	err := h.usecase.Confirm(token)
 	if err != nil {
-		h.sendFromAppError(w, err)
+		h.sendFromAppError(c, err)
 		return
 	}
 
-	h.sendSuccess(w, "Subscription confirmed successfully")
+	c.JSON(http.StatusOK, APIResponse{
+		Status:  "success",
+		Message: "Subscription confirmed successfully",
+	})
 }
 
-func (h *SubscriptionHandler) UnsubscribeHandler(w http.ResponseWriter, r *http.Request) {
-	token := r.PathValue("token")
+func (h *SubscriptionHandler) UnsubscribeHandler(c *gin.Context) {
+	token := c.Param("token")
 
 	err := h.usecase.Unsubscribe(token)
 	if err != nil {
-		h.sendFromAppError(w, err)
+		h.sendFromAppError(c, err)
 		return
 	}
 
-	h.sendSuccess(w, "Unsubscribed successfully")
+	c.JSON(http.StatusOK, APIResponse{
+		Status:  "success",
+		Message: "Unsubscribed successfully",
+	})
 }
 
-func (h *SubscriptionHandler) GetSubscriptionsHandler(w http.ResponseWriter, r *http.Request) {
-	email := r.URL.Query().Get("email")
+func (h *SubscriptionHandler) GetSubscriptionsHandler(c *gin.Context) {
+	email := c.Query("email")
 
 	subscriptions, err := h.usecase.GetSubscriptions(email)
 	if err != nil {
-		h.sendFromAppError(w, err)
+		h.sendFromAppError(c, err)
 		return
 	}
 
-	h.sendJSON(w, http.StatusOK, subscriptions)
+	c.JSON(http.StatusOK, subscriptions)
 }

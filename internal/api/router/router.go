@@ -1,8 +1,7 @@
 package router
 
 import (
-	"net/http"
-
+	"github.com/gin-gonic/gin"
 	"github.com/reqlane/github-releases-notifier/internal/api/handler"
 )
 
@@ -16,13 +15,11 @@ func NewRouter(h *handler.SubscriptionHandler) *Router {
 	}
 }
 
-func (r *Router) Build() *http.ServeMux {
-	mux := http.NewServeMux()
+func (r *Router) Build() *gin.Engine {
+	engine := gin.Default()
 
-	apiMux := http.NewServeMux()
-	r.subscriptionRouter(apiMux)
+	api := engine.Group("/api")
+	r.subscriptionRouter(api)
 
-	mux.Handle("/api/", http.StripPrefix("/api", apiMux))
-
-	return mux
+	return engine
 }

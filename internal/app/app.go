@@ -9,6 +9,7 @@ import (
 	"github.com/reqlane/github-releases-notifier/internal/api/handler"
 	"github.com/reqlane/github-releases-notifier/internal/api/router"
 	"github.com/reqlane/github-releases-notifier/internal/config"
+	"github.com/reqlane/github-releases-notifier/internal/contract"
 	"github.com/reqlane/github-releases-notifier/internal/db"
 	"github.com/reqlane/github-releases-notifier/internal/githubapi"
 	"github.com/reqlane/github-releases-notifier/internal/notifier/gomail"
@@ -52,43 +53,43 @@ func Run() (err error) {
 		return
 	}
 
-	githubApiToken := cfg.GithubToken
+	httpclient := http.Client{Timeout: 10 * time.Second}
+	githubClient := githubapi.NewClient(&httpclient, logger, cfg.GithubToken)
 
-	client := http.Client{Timeout: 10 * time.Second}
-	githubClient := githubapi.NewClient(&client, logger, githubApiToken)
+	notifier := initNotifier(cfg)
 
-	notif := gomail.NewNotifier(gomail.GomailNotifierConfig{
+	repository := mariadb.NewSubscriptionRepo(dbConn, logger)
+	subscriptionUseCase := usecase.NewSubscriptionUseCase(repository, githubClient, notifier)
+	subscriptionHandler := handler.NewSubcriptionHandler(subscriptionUseCase, logger)
+
+	scan := initScanner(repository, githubClient, notifier, logger, cfg.GithubToken)
+	go scan.Run()
+
+	rt := router.NewRouter(subscriptionHandler)
+	engine := rt.Build()
+
+	err = engine.Run(":" + cfg.ServerPort)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+func initNotifier(cfg *config.Config) contract.Notifier {
+	return gomail.NewNotifier(gomail.GomailNotifierConfig{
 		Host:          cfg.SMTPHost,
 		Port:          cfg.SMTPPort,
 		Username:      cfg.SMTPUsername,
 		Password:      cfg.SMTPPassword,
 		ServerBaseURL: cfg.ServerBaseURL,
 	})
+}
 
-	repository := mariadb.NewSubscriptionRepo(dbConn, logger)
-	subscriptionUseCase := usecase.NewSubscriptionUseCase(repository, githubClient, notif)
-	subscriptionHandler := handler.NewSubcriptionHandler(subscriptionUseCase, logger)
-
-	scan := scanner.NewFixedRateScanner(repository, githubClient, notif, logger)
-	if githubApiToken == "" {
+func initScanner(r contract.SubscriptionRepo, g contract.GithubClient, n contract.Notifier, l zerolog.Logger, githubAPIToken string) *scanner.FixedRateScanner {
+	scan := scanner.NewFixedRateScanner(r, g, n, l)
+	if githubAPIToken == "" {
 		scan.SetRequestsPerMin(1)
 	}
-	go scan.Run()
-
-	rt := router.NewRouter(subscriptionHandler)
-	mux := rt.Build()
-
-	server := http.Server{
-		Addr:    ":" + cfg.ServerPort,
-		Handler: mux,
-	}
-
-	logger.Info().Msg("Server is running on port: " + cfg.ServerPort)
-	err = server.ListenAndServe()
-	if err != nil {
-		logger.Err(err).Msg("error starting the server")
-		return
-	}
-
-	return
+	return scan
 }

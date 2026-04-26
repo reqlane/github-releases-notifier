@@ -13,8 +13,8 @@ import (
 )
 
 // Helpers
-func newScanner(r *mock.MockRepository, g *mock.MockGithubClient, n *mock.MockNotifier) *fixedRateScanner {
-	return &fixedRateScanner{
+func newScanner(r *mock.MockRepository, g *mock.MockGithubClient, n *mock.MockNotifier) *FixedRateScanner {
+	return &FixedRateScanner{
 		repo:           r,
 		githubClient:   g,
 		notif:          n,

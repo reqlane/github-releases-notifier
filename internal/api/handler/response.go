@@ -1,13 +1,13 @@
 package handler
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/reqlane/github-releases-notifier/internal/apperror"
 )
 
@@ -17,23 +17,7 @@ type APIResponse struct {
 	Details map[string]string `json:"details,omitempty"`
 }
 
-func (h *SubscriptionHandler) sendSuccess(w http.ResponseWriter, message string) {
-	response := APIResponse{
-		Status:  "success",
-		Message: message,
-	}
-	h.sendJSON(w, http.StatusOK, response)
-}
-
-func (h *SubscriptionHandler) sendError(w http.ResponseWriter, message string, code int) {
-	response := APIResponse{
-		Status:  "error",
-		Message: message,
-	}
-	h.sendJSON(w, code, response)
-}
-
-func (h *SubscriptionHandler) sendFromAppError(w http.ResponseWriter, err error) {
+func (h *SubscriptionHandler) sendFromAppError(c *gin.Context, err error) {
 	response := APIResponse{Status: "error"}
 	var code int
 
@@ -48,7 +32,7 @@ func (h *SubscriptionHandler) sendFromAppError(w http.ResponseWriter, err error)
 		response.Message = fmt.Sprintf("%s not found", e.Resource)
 	} else if e, ok := errors.AsType[*apperror.ErrGithubAPIRateLimited](err); ok {
 		seconds := int(time.Until(e.ResetTime).Seconds())
-		w.Header().Set("Retry-After", strconv.Itoa(seconds))
+		c.Header("Retry-After", strconv.Itoa(seconds))
 		code = http.StatusServiceUnavailable
 		response.Message = fmt.Sprintf("Service temporarily unavailable, please retry after %d seconds", seconds)
 	} else if ev, ok := errors.AsType[*apperror.ErrValidation](err); ok {
@@ -76,14 +60,5 @@ func (h *SubscriptionHandler) sendFromAppError(w http.ResponseWriter, err error)
 		h.logger.Err(err).Msg("unexpected error")
 	}
 
-	h.sendJSON(w, code, response)
-}
-
-func (h *SubscriptionHandler) sendJSON(w http.ResponseWriter, code int, response any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	err := json.NewEncoder(w).Encode(response)
-	if err != nil {
-		h.logger.Err(err).Msg("error encoding response")
-	}
+	c.JSON(code, response)
 }

@@ -21,7 +21,7 @@ const (
 //
 // No more than 100 concurrent requests are allowed.
 // No more than 900 points per minute are allowed for REST API endpoints.
-type fixedRateScanner struct {
+type FixedRateScanner struct {
 	repo           contract.SubscriptionRepo
 	githubClient   contract.GithubClient
 	notif          contract.Notifier
@@ -32,8 +32,8 @@ type fixedRateScanner struct {
 	sleepFn        func(time.Duration)
 }
 
-func NewFixedRateScanner(r contract.SubscriptionRepo, g contract.GithubClient, n contract.Notifier, l zerolog.Logger) *fixedRateScanner {
-	return &fixedRateScanner{
+func NewFixedRateScanner(r contract.SubscriptionRepo, g contract.GithubClient, n contract.Notifier, l zerolog.Logger) *FixedRateScanner {
+	return &FixedRateScanner{
 		repo:           r,
 		githubClient:   g,
 		notif:          n,
@@ -46,17 +46,17 @@ func NewFixedRateScanner(r contract.SubscriptionRepo, g contract.GithubClient, n
 	}
 }
 
-func (s *fixedRateScanner) SetRequestsPerMin(requestsPerMin int) {
+func (s *FixedRateScanner) SetRequestsPerMin(requestsPerMin int) {
 	s.requestsPerMin = requestsPerMin
 }
 
-func (s *fixedRateScanner) Run() {
+func (s *FixedRateScanner) Run() {
 	for {
 		s.scan()
 	}
 }
 
-func (s *fixedRateScanner) scan() {
+func (s *FixedRateScanner) scan() {
 	// Get subscribed repos
 	repos, err := s.repo.GetSubscribedRepos()
 	if err != nil {
@@ -96,7 +96,7 @@ func (s *fixedRateScanner) scan() {
 	}
 }
 
-func (s *fixedRateScanner) checkRepo(repo model.Repo) {
+func (s *FixedRateScanner) checkRepo(repo model.Repo) {
 	tag, err := s.githubClient.GetLatestRelease(repo.Repo)
 	if err != nil && !errors.Is(err, apperror.ErrGithubRepoNoReleases) {
 		if e, ok := errors.AsType[*apperror.ErrGithubAPIRateLimited](err); ok {
