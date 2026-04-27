@@ -56,7 +56,7 @@ func (s *subscriptionUseCase) Subscribe(input *SubscribeInput) error {
 		return err
 	}
 	if errors.Is(err, apperror.ErrNotFound) {
-		trackedRepo, err = s.repo.CreateRepo(model.Repo{Repo: input.Repo, LastSeenTag: lastSeenTag})
+		trackedRepo, err = s.repo.CreateRepo(input.Repo, lastSeenTag)
 		if err != nil {
 			// possible race condition
 			if errors.Is(err, apperror.ErrAlreadyExists) {

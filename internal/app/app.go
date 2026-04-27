@@ -42,7 +42,12 @@ func Run() (err error) {
 		return
 	}
 	defer func() {
-		if err = dbConn.Close(); err != nil {
+		sqlDB, err := dbConn.DB()
+		if err != nil {
+			logger.Err(err).Msg("error getting sql.DB from gorm")
+			return
+		}
+		if err = sqlDB.Close(); err != nil {
 			logger.Err(err).Msg("error closing db connection")
 		}
 	}()
@@ -58,7 +63,7 @@ func Run() (err error) {
 
 	notifier := initNotifier(cfg)
 
-	repository := mariadb.NewSubscriptionRepo(dbConn, logger)
+	repository := mariadb.NewSubscriptionRepo(dbConn)
 	subscriptionUseCase := usecase.NewSubscriptionUseCase(repository, githubClient, notifier)
 	subscriptionHandler := handler.NewSubcriptionHandler(subscriptionUseCase, logger)
 

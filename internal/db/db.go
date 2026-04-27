@@ -1,41 +1,49 @@
 package db
 
 import (
-	"database/sql"
-	"fmt"
-
-	_ "github.com/go-sql-driver/mysql"
 	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database/mysql"
+	mysqlmigrate "github.com/golang-migrate/migrate/v4/database/mysql"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
 )
 
-func ConnectDB(DSN string) (*sql.DB, error) {
-	db, err := sql.Open("mysql", DSN)
+func ConnectDB(dsn string) (*gorm.DB, error) {
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
-		return nil, fmt.Errorf("db.ConnectDB: %w", err)
+		return nil, err
 	}
 
-	err = db.Ping()
+	sqlDB, err := db.DB()
 	if err != nil {
-		return nil, fmt.Errorf("db.ConnectDB: %w", err)
+		return nil, err
+	}
+
+	err = sqlDB.Ping()
+	if err != nil {
+		return nil, err
 	}
 	return db, nil
 }
 
-func RunMigrations(db *sql.DB) error {
-	driver, err := mysql.WithInstance(db, &mysql.Config{})
+func RunMigrations(db *gorm.DB) error {
+	sqlDB, err := db.DB()
 	if err != nil {
-		return fmt.Errorf("db.RunMigrations: %w", err)
+		return err
+	}
+
+	driver, err := mysqlmigrate.WithInstance(sqlDB, &mysqlmigrate.Config{})
+	if err != nil {
+		return err
 	}
 
 	m, err := migrate.NewWithDatabaseInstance("file://migrations", "mysql", driver)
 	if err != nil {
-		return fmt.Errorf("db.RunMigrations: %w", err)
+		return err
 	}
 
 	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-		return fmt.Errorf("db.RunMigrations: %w", err)
+		return err
 	}
 	return nil
 }

@@ -77,11 +77,11 @@ func TestCheckRepoNewReleaseNotifiesAllUpdadtesTagEvenIfEmpty(t *testing.T) {
 	notifyCalled := 0
 
 	repo := mock.IdealRepository()
-	repo.UpdateLastSeenTagFunc = func(repoID int, tag string) error {
+	repo.UpdateLastSeenTagFunc = func(repoID uint, tag string) error {
 		updateCalled = true
 		return nil
 	}
-	repo.GetNotificationTargetsByRepoFunc = func(repoID int) ([]model.NotificationTarget, error) {
+	repo.GetNotificationTargetsByRepoFunc = func(repoID uint) ([]model.NotificationTarget, error) {
 		return []model.NotificationTarget{
 			{Email: "user1@example.com", UnsubscribeToken: "token1"},
 			{Email: "user2@example.com", UnsubscribeToken: "token2"},
@@ -118,7 +118,7 @@ func TestCheckRepoSameTagNoUpdateNoNotify(t *testing.T) {
 	notifyCalled := false
 
 	repo := mock.IdealRepository()
-	repo.UpdateLastSeenTagFunc = func(repoID int, tag string) error {
+	repo.UpdateLastSeenTagFunc = func(repoID uint, tag string) error {
 		updateCalled = true
 		return nil
 	}
@@ -151,7 +151,7 @@ func TestCheckRepoNoReleasesNoUpdateNoNotify(t *testing.T) {
 	notifyCalled := false
 
 	repo := mock.IdealRepository()
-	repo.UpdateLastSeenTagFunc = func(repoID int, tag string) error {
+	repo.UpdateLastSeenTagFunc = func(repoID uint, tag string) error {
 		updateCalled = true
 		return nil
 	}
@@ -203,7 +203,7 @@ func TestCheckRepoUpdateTagFailsNoNotification(t *testing.T) {
 	notifyCalled := false
 
 	repo := mock.IdealRepository()
-	repo.UpdateLastSeenTagFunc = func(repoID int, tag string) error {
+	repo.UpdateLastSeenTagFunc = func(repoID uint, tag string) error {
 		return errors.New("db error")
 	}
 
@@ -230,7 +230,7 @@ func TestCheckRepoGetTargetsFailsNoNotification(t *testing.T) {
 	notifyCalled := false
 
 	repo := mock.IdealRepository()
-	repo.GetNotificationTargetsByRepoFunc = func(repoID int) ([]model.NotificationTarget, error) {
+	repo.GetNotificationTargetsByRepoFunc = func(repoID uint) ([]model.NotificationTarget, error) {
 		return nil, errors.New("db error")
 	}
 
@@ -257,7 +257,7 @@ func TestCheckRepoOneNotifyFailsOthersStillNotified(t *testing.T) {
 	notifyCount := 0
 
 	repo := mock.IdealRepository()
-	repo.GetNotificationTargetsByRepoFunc = func(repoID int) ([]model.NotificationTarget, error) {
+	repo.GetNotificationTargetsByRepoFunc = func(repoID uint) ([]model.NotificationTarget, error) {
 		return []model.NotificationTarget{
 			{Email: "user1@example.com", UnsubscribeToken: "token1"},
 			{Email: "user2@example.com", UnsubscribeToken: "token2"},

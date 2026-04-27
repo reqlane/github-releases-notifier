@@ -1,212 +1,141 @@
 package mariadb
 
 import (
-	"database/sql"
 	"errors"
 
-	"github.com/go-sql-driver/mysql"
 	"github.com/reqlane/github-releases-notifier/internal/apperror"
 	"github.com/reqlane/github-releases-notifier/internal/contract"
+	"github.com/reqlane/github-releases-notifier/internal/entity"
 	"github.com/reqlane/github-releases-notifier/internal/model"
-	"github.com/rs/zerolog"
+	"gorm.io/gorm"
 )
 
 type mariadbSubscriptionRepo struct {
-	db     *sql.DB
-	logger zerolog.Logger
+	db *gorm.DB
 }
 
-func NewSubscriptionRepo(db *sql.DB, l zerolog.Logger) contract.SubscriptionRepo {
-	return &mariadbSubscriptionRepo{db: db, logger: l}
+func NewSubscriptionRepo(db *gorm.DB) contract.SubscriptionRepo {
+	return &mariadbSubscriptionRepo{db: db}
 }
 
 func (r *mariadbSubscriptionRepo) GetSubscriptionsByEmail(email string) ([]model.Subscription, error) {
-	query := `SELECT s.email, r.repo, s.confirmed, r.last_seen_tag FROM subscriptions s JOIN repos r ON s.repo_id = r.id WHERE email=?`
-	rows, err := r.db.Query(query, email)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		if err := rows.Close(); err != nil {
-			r.logger.Err(err).Msg("error closing rows from db.Query")
-		}
-	}()
-
 	subscriptions := make([]model.Subscription, 0)
-	for rows.Next() {
-		var subscription model.Subscription
-		err = rows.Scan(&subscription.Email, &subscription.Repo, &subscription.Confirmed, &subscription.LastSeenTag)
-		if err != nil {
-			return nil, err
-		}
-		subscriptions = append(subscriptions, subscription)
+	result := r.db.
+		Select(`subscriptions.email, Repo.repo, subscriptions.confirmed, Repo.last_seen_tag`).
+		Model(&entity.Subscription{}).
+		InnerJoins("Repo").
+		Where(`subscriptions.email = ?`, email).
+		Scan(&subscriptions)
+	if result.Error != nil {
+		return nil, result.Error
 	}
-
-	err = rows.Err()
-	if err != nil {
-		return nil, err
-	}
-
 	return subscriptions, nil
 }
 
-func (r *mariadbSubscriptionRepo) CreateSubscription(email string, repoID int, confirmToken, unsubscribeToken string) error {
-	query := `INSERT INTO subscriptions (email, repo_id, confirm_token, unsubscribe_token) VALUES (?,?,?,?)`
-	_, err := r.db.Exec(query, email, repoID, confirmToken, unsubscribeToken)
-	if err != nil {
-		return err
+func (r *mariadbSubscriptionRepo) CreateSubscription(email string, repoID uint, confirmToken, unsubscribeToken string) error {
+	subscription := entity.Subscription{
+		Email:            email,
+		RepoID:           repoID,
+		ConfirmToken:     &confirmToken,
+		UnsubscribeToken: unsubscribeToken,
 	}
-	return nil
+	return r.db.Create(&subscription).Error
 }
 
 func (r *mariadbSubscriptionRepo) SubscriptionExists(email string, repoName string) (bool, error) {
 	query := `SELECT EXISTS(SELECT 1 FROM subscriptions s JOIN repos r ON s.repo_id = r.id WHERE s.email=? AND r.repo=?)`
 	var exists bool
-	err := r.db.QueryRow(query, email, repoName).Scan(&exists)
-	if err != nil {
-		return false, err
-	}
-	return exists, nil
+	result := r.db.
+		Raw(query, email, repoName).
+		Scan(&exists)
+	return exists, result.Error
 }
 
 func (r *mariadbSubscriptionRepo) ConfirmSubscription(confirmToken string) error {
-	query := `UPDATE subscriptions SET confirmed=true, confirm_token=NULL WHERE confirm_token=?`
-	res, err := r.db.Exec(query, confirmToken)
-	if err != nil {
-		return err
+	result := r.db.
+		Model(&entity.Subscription{}).
+		Where(`confirm_token = ?`, confirmToken).
+		Updates(map[string]any{"confirmed": true, "confirm_token": nil})
+	if result.Error != nil {
+		return result.Error
 	}
-
-	rowsAffected, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if rowsAffected == 0 {
+	if result.RowsAffected == 0 {
 		return apperror.ErrNotFound
 	}
-
 	return nil
 }
 
 func (r *mariadbSubscriptionRepo) DeleteSubscription(unsubscribeToken string) error {
-	query := `DELETE FROM subscriptions WHERE unsubscribe_token=?`
-	res, err := r.db.Exec(query, unsubscribeToken)
-	if err != nil {
-		return err
+	result := r.db.
+		Where(`unsubscribe_token = ?`, unsubscribeToken).
+		Delete(&entity.Subscription{})
+	if result.Error != nil {
+		return result.Error
 	}
-
-	rowsAffected, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if rowsAffected == 0 {
+	if result.RowsAffected == 0 {
 		return apperror.ErrNotFound
 	}
-
 	return nil
 }
 
 func (r *mariadbSubscriptionRepo) GetRepoByName(repoName string) (model.Repo, error) {
-	query := `SELECT id, repo, last_seen_tag FROM repos WHERE repo=?`
-	var repo model.Repo
-
-	err := r.db.QueryRow(query, repoName).Scan(&repo.ID, &repo.Repo, &repo.LastSeenTag)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+	var repo entity.Repo
+	result := r.db.
+		Where(`repo = ?`, repoName).
+		First(&repo)
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return model.Repo{}, apperror.ErrNotFound
 		}
-		return model.Repo{}, err
+		return model.Repo{}, result.Error
 	}
-
-	return repo, nil
+	return model.Repo{ID: repo.ID, Repo: repo.Repo, LastSeenTag: repo.LastSeenTag}, nil
 }
 
-func (r *mariadbSubscriptionRepo) CreateRepo(repo model.Repo) (model.Repo, error) {
-	query := `INSERT INTO repos (repo, last_seen_tag) VALUES (?,?)`
-
-	result, err := r.db.Exec(query, repo.Repo, repo.LastSeenTag)
-	if err != nil {
-		if mysqlErr, ok := errors.AsType[*mysql.MySQLError](err); ok {
-			if mysqlErr.Number == 1062 {
-				return model.Repo{}, apperror.ErrAlreadyExists
-			}
+func (r *mariadbSubscriptionRepo) CreateRepo(repoName, lastSeenTag string) (model.Repo, error) {
+	repo := entity.Repo{Repo: repoName, LastSeenTag: lastSeenTag}
+	result := r.db.Create(&repo)
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrDuplicatedKey) {
+			return model.Repo{}, apperror.ErrAlreadyExists
 		}
-		return model.Repo{}, err
+		return model.Repo{}, result.Error
 	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		return model.Repo{}, err
-	}
-
-	repo.ID = int(id)
-	return repo, nil
+	return model.Repo{ID: repo.ID, Repo: repo.Repo, LastSeenTag: repo.LastSeenTag}, nil
 }
 
 func (r *mariadbSubscriptionRepo) GetSubscribedRepos() ([]model.Repo, error) {
-	query := `SELECT id, repo, last_seen_tag FROM repos WHERE EXISTS (SELECT 1 FROM subscriptions WHERE repo_id=repos.id AND confirmed=true)`
-	rows, err := r.db.Query(query)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		if err := rows.Close(); err != nil {
-			r.logger.Err(err).Msg("error closing rows from db.Query")
-		}
-	}()
-
-	repos := make([]model.Repo, 0)
-	for rows.Next() {
-		var repo model.Repo
-		err = rows.Scan(&repo.ID, &repo.Repo, &repo.LastSeenTag)
-		if err != nil {
-			return nil, err
-		}
-		repos = append(repos, repo)
+	repos := make([]entity.Repo, 0)
+	result := r.db.
+		Where(`EXISTS (SELECT 1 FROM subscriptions WHERE repo_id=repos.id AND confirmed=true)`).
+		Find(&repos)
+	if result.Error != nil {
+		return nil, result.Error
 	}
 
-	err = rows.Err()
-	if err != nil {
-		return nil, err
+	models := make([]model.Repo, len(repos))
+	for i, e := range repos {
+		models[i] = model.Repo{ID: e.ID, Repo: e.Repo, LastSeenTag: e.LastSeenTag}
 	}
-
-	return repos, nil
+	return models, nil
 }
 
-func (r *mariadbSubscriptionRepo) GetNotificationTargetsByRepo(repoID int) ([]model.NotificationTarget, error) {
-	query := `SELECT email, unsubscribe_token FROM subscribers WHERE repo_id=? AND confirmed=true`
-	rows, err := r.db.Query(query, repoID)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		if err := rows.Close(); err != nil {
-			r.logger.Err(err).Msg("error closing rows from db.Query")
-		}
-	}()
-
+func (r *mariadbSubscriptionRepo) GetNotificationTargetsByRepo(repoID uint) ([]model.NotificationTarget, error) {
 	targets := make([]model.NotificationTarget, 0)
-	for rows.Next() {
-		var target model.NotificationTarget
-		err = rows.Scan(&target.Email, &target.UnsubscribeToken)
-		if err != nil {
-			return nil, err
-		}
-		targets = append(targets, target)
+	result := r.db.
+		Select(`email, unsubscribe_token`).
+		Model(&entity.Subscription{}).
+		Where(`repo_id = ? AND confirmed = true`, repoID).
+		Scan(&targets)
+	if result.Error != nil {
+		return nil, result.Error
 	}
-
-	err = rows.Err()
-	if err != nil {
-		return nil, err
-	}
-
 	return targets, nil
 }
 
-func (r *mariadbSubscriptionRepo) UpdateLastSeenTag(repoID int, tag string) error {
-	query := `UPDATE repos SET last_seen_tag=? WHERE id=?`
-	_, err := r.db.Exec(query, tag, repoID)
-	if err != nil {
-		return err
-	}
-	return nil
+func (r *mariadbSubscriptionRepo) UpdateLastSeenTag(repoID uint, tag string) error {
+	return r.db.
+		Model(&entity.Repo{ID: repoID}).
+		Update("last_seen_tag", tag).
+		Error
 }

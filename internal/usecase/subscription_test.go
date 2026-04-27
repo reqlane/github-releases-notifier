@@ -133,7 +133,7 @@ func TestSubscribeRepoNotInDBCreatesIt(t *testing.T) {
 	repo.GetRepoByNameFunc = func(repoName string) (model.Repo, error) {
 		return model.Repo{}, apperror.ErrNotFound
 	}
-	repo.CreateRepoFunc = func(r model.Repo) (model.Repo, error) {
+	repo.CreateRepoFunc = func(repoName, lastSeenTag string) (model.Repo, error) {
 		createRepoCalled = true
 		return model.Repo{}, nil
 	}
@@ -159,7 +159,7 @@ func TestSubscribeRepoRaceConditionFallsBackToGet(t *testing.T) {
 		}
 		return model.Repo{}, nil
 	}
-	repo.CreateRepoFunc = func(repo model.Repo) (model.Repo, error) {
+	repo.CreateRepoFunc = func(repoName, lastSeenTag string) (model.Repo, error) {
 		return model.Repo{}, apperror.ErrAlreadyExists
 	}
 
