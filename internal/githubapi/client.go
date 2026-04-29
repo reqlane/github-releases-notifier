@@ -82,20 +82,20 @@ func (g *client) RepoExists(repo string) error {
 	}
 }
 
-func (g *client) GetLatestRelease(repo string) (string, error) {
+func (g *client) GetLatestRelease(repo string) (*string, error) {
 	if blocked, until := g.blockStatus(); blocked {
-		return "", &apperror.ErrGithubAPIRateLimited{ResetTime: until}
+		return nil, &apperror.ErrGithubAPIRateLimited{ResetTime: until}
 	}
 
 	reqURL := fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", repo)
 	req, err := g.githubRequest(http.MethodGet, reqURL)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	resp, err := g.client.Do(req)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
@@ -109,25 +109,25 @@ func (g *client) GetLatestRelease(repo string) (string, error) {
 			TagName string `json:"tag_name"`
 		}
 		if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
-			return "", fmt.Errorf("error decoding github api response: %w", err)
+			return nil, fmt.Errorf("error decoding github api response: %w", err)
 		}
-		return release.TagName, nil
+		return &release.TagName, nil
 	case http.StatusUnauthorized:
-		return "", apperror.ErrInvalidGithubAPIToken
+		return nil, apperror.ErrInvalidGithubAPIToken
 	case http.StatusForbidden:
 		// 403 Forbidden is rate limit related when X-RateLimit-Remaining is 0
 		if resp.Header.Get("X-RateLimit-Remaining") == "0" {
 			t := g.handleRateLimit(resp)
-			return "", &apperror.ErrGithubAPIRateLimited{ResetTime: t}
+			return nil, &apperror.ErrGithubAPIRateLimited{ResetTime: t}
 		}
-		return "", apperror.ErrGithubForbidden
+		return nil, apperror.ErrGithubForbidden
 	case http.StatusNotFound:
-		return "", apperror.ErrGithubRepoNoReleases
+		return nil, apperror.ErrGithubRepoNoReleases
 	case http.StatusTooManyRequests:
 		t := g.handleRateLimit(resp)
-		return "", &apperror.ErrGithubAPIRateLimited{ResetTime: t}
+		return nil, &apperror.ErrGithubAPIRateLimited{ResetTime: t}
 	default:
-		return "", fmt.Errorf("unexpected github api response code: %d", resp.StatusCode)
+		return nil, fmt.Errorf("unexpected github api response code: %d", resp.StatusCode)
 	}
 }
 

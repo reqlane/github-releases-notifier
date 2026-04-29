@@ -1,17 +1,24 @@
 package usecase
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/reqlane/github-releases-notifier/internal/apperror"
-	"github.com/reqlane/github-releases-notifier/internal/mock"
+	mockgithubapi "github.com/reqlane/github-releases-notifier/internal/mock/githubapi"
+	mocknotifier "github.com/reqlane/github-releases-notifier/internal/mock/notifier"
+	mockrepository "github.com/reqlane/github-releases-notifier/internal/mock/repository"
 	"github.com/reqlane/github-releases-notifier/internal/model"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 // Helpers
+const (
+	ANY = mock.Anything
+)
+
 var (
 	invalidEmails = []struct {
 		name  string
@@ -50,265 +57,251 @@ var (
 	}
 )
 
-func newService(r *mock.MockRepository, g *mock.MockGithubClient, n *mock.MockNotifier) SubscriptionUseCase {
+func setupMocks() (*mockrepository.SubscriptionRepo, *mockgithubapi.GithubClient, *mocknotifier.Notifier) {
+	return new(mockrepository.SubscriptionRepo),
+		new(mockgithubapi.GithubClient),
+		new(mocknotifier.Notifier)
+}
+
+func newSubscriptionUseCase(r *mockrepository.SubscriptionRepo, g *mockgithubapi.GithubClient, n *mocknotifier.Notifier) SubscriptionUseCase {
 	return NewSubscriptionUseCase(r, g, n)
 }
 
-// Subscribe tests
-func TestSubscribeSuccess(t *testing.T) {
-	svc := newService(mock.IdealRepository(), mock.IdealGithubClient(), mock.IdealNotifier())
-	err := svc.Subscribe(&SubscribeInput{Email: "user@example.com", Repo: "owner/repo"})
-	if err != nil {
-		t.Errorf("expected no error, got: %v", err)
-	}
-}
+func TestSubscriptionUseCase_Subscribe(t *testing.T) {
+	t.Run("subscribe success path", func(t *testing.T) {
+		repo, ghclient, notif := setupMocks()
+		usecase := newSubscriptionUseCase(repo, ghclient, notif)
 
-func TestSubscribeInvalidEmail(t *testing.T) {
-	svc := newService(mock.IdealRepository(), mock.IdealGithubClient(), mock.IdealNotifier())
-
-	for _, tt := range invalidEmails {
-		t.Run(tt.name, func(t *testing.T) {
-			err := svc.Subscribe(&SubscribeInput{Email: "not-an-email", Repo: "owner/repo"})
-			if _, ok := errors.AsType[*apperror.ErrValidation](err); !ok {
-				t.Errorf("expected *ErrValidation, got: %T", err)
-			}
-		})
-	}
-}
-
-func TestSubscribeInvalidRepo(t *testing.T) {
-	svc := newService(mock.IdealRepository(), mock.IdealGithubClient(), mock.IdealNotifier())
-
-	for _, tt := range invalidRepos {
-		t.Run(tt.name, func(t *testing.T) {
-			err := svc.Subscribe(&SubscribeInput{Email: "user@example.com", Repo: tt.repo})
-			if _, ok := errors.AsType[*apperror.ErrValidation](err); !ok {
-				t.Errorf("expected *ErrValidation for %s, got: %T", tt.repo, err)
-			}
-		})
-	}
-}
-
-func TestSubscribeSubscriptionAlreadyExists(t *testing.T) {
-	repo := mock.IdealRepository()
-	repo.SubscriptionExistsFunc = func(email string, repoName string) (bool, error) { return true, nil }
-
-	svc := newService(repo, mock.IdealGithubClient(), mock.IdealNotifier())
-	err := svc.Subscribe(&SubscribeInput{Email: "user@example.com", Repo: "owner/repo"})
-	if !errors.Is(err, apperror.ErrSubscriptionAlreadyExists) {
-		t.Errorf("expected ErrSubscriptionAlreadyExists, got: %v", err)
-	}
-}
-
-func TestSubscribeRepoNotFoundOnGithub(t *testing.T) {
-	githubClient := mock.IdealGithubClient()
-	githubClient.RepoExistsFunc = func(repo string) error {
-		return &apperror.ErrResourceNotFound{Resource: "Github repository"}
-	}
-
-	svc := newService(mock.IdealRepository(), githubClient, mock.IdealNotifier())
-	err := svc.Subscribe(&SubscribeInput{Email: "user@example.com", Repo: "owner/repo"})
-	if _, ok := errors.AsType[*apperror.ErrResourceNotFound](err); !ok {
-		t.Errorf("expected *ErrResourceNotFound, got: %T", err)
-	}
-}
-
-func TestSubscribeRepoHasNoReleasesSucceeds(t *testing.T) {
-	githubClient := mock.IdealGithubClient()
-	githubClient.GetLatestReleaseFunc = func(repo string) (string, error) {
-		return "", apperror.ErrGithubRepoNoReleases
-	}
-
-	svc := newService(mock.IdealRepository(), githubClient, mock.IdealNotifier())
-	err := svc.Subscribe(&SubscribeInput{Email: "user@example.com", Repo: "owner/repo"})
-	if err != nil {
-		t.Errorf("expected no error for repo with no releases, got: %v", err)
-	}
-}
-
-func TestSubscribeRepoNotInDBCreatesIt(t *testing.T) {
-	createRepoCalled := false
-
-	repo := mock.IdealRepository()
-	repo.GetRepoByNameFunc = func(repoName string) (model.Repo, error) {
-		return model.Repo{}, apperror.ErrNotFound
-	}
-	repo.CreateRepoFunc = func(repoName, lastSeenTag string) (model.Repo, error) {
-		createRepoCalled = true
-		return model.Repo{}, nil
-	}
-
-	svc := newService(repo, mock.IdealGithubClient(), mock.IdealNotifier())
-	err := svc.Subscribe(&SubscribeInput{Email: "user@example.com", Repo: "owner/repo"})
-	if err != nil {
-		t.Errorf("expected no error, got: %v", err)
-	}
-	if !createRepoCalled {
-		t.Error("expected CreateRepo to be called")
-	}
-}
-
-func TestSubscribeRepoRaceConditionFallsBackToGet(t *testing.T) {
-	// CreateRepo fails with ErrAlreadyExists if race condition lost, then GetRepoByName is expected to be called
-	repo := mock.IdealRepository()
-	getRepoByNameCalls := 0
-	repo.GetRepoByNameFunc = func(repoName string) (model.Repo, error) {
-		getRepoByNameCalls++
-		if getRepoByNameCalls == 1 {
-			return model.Repo{}, apperror.ErrNotFound
+		input := &SubscribeInput{
+			Email: "user@example.com",
+			Repo:  "owner/repo",
 		}
-		return model.Repo{}, nil
-	}
-	repo.CreateRepoFunc = func(repoName, lastSeenTag string) (model.Repo, error) {
-		return model.Repo{}, apperror.ErrAlreadyExists
-	}
+		lastSeenTag := "1.0.0"
+		repoID := uint(100)
 
-	svc := newService(repo, mock.IdealGithubClient(), mock.IdealNotifier())
-	err := svc.Subscribe(&SubscribeInput{Email: "user@example.com", Repo: "owner/repo"})
-	if err != nil {
-		t.Errorf("expected no error on race condition fallback, got: %v", err)
-	}
-	if getRepoByNameCalls != 2 {
-		t.Errorf("expected GetRepoByName to be called twice, got %d", getRepoByNameCalls)
-	}
+		// subscription existence
+		repo.On("SubscriptionExists", input.Email, input.Repo).Return(false, nil).Once()
+
+		// github api calls
+		ghclient.
+			On("RepoExists", input.Repo).Return(nil).Once().
+			On("GetLatestRelease", input.Repo).Return(&lastSeenTag, nil).Once()
+
+		// database creation
+		repo.
+			On("GetOrCreateRepo", input.Repo, &lastSeenTag).Return(model.Repo{ID: repoID}, nil).Once().
+			On("CreateSubscription", input.Email, repoID, ANY, ANY).Return(nil).Once()
+
+		// confirmation email
+		notif.On("SendConfirmation", input.Email, input.Repo, ANY, ANY).Return(nil).Once()
+
+		err := usecase.Subscribe(input)
+
+		assert.NoError(t, err)
+		mock.AssertExpectationsForObjects(t, repo, ghclient, notif)
+	})
+
+	t.Run("should return validation error if email format is invalid", func(t *testing.T) {
+		repo, ghclient, notif := setupMocks()
+		usecase := newSubscriptionUseCase(repo, ghclient, notif)
+		for _, tt := range invalidEmails {
+			t.Run(tt.name, func(t *testing.T) {
+				err := usecase.Subscribe(&SubscribeInput{
+					Email: tt.email,
+					Repo:  "owner/repo",
+				})
+				assert.ErrorAs(t, err, new(*apperror.ErrValidation))
+				mock.AssertExpectationsForObjects(t, repo, ghclient, notif)
+			})
+		}
+	})
+
+	t.Run("should return validation error if repo format is invalid", func(t *testing.T) {
+		repo, ghclient, notif := setupMocks()
+		usecase := newSubscriptionUseCase(repo, ghclient, notif)
+		for _, tt := range invalidRepos {
+			t.Run(tt.name, func(t *testing.T) {
+				err := usecase.Subscribe(&SubscribeInput{
+					Email: "user@example.com",
+					Repo:  tt.repo,
+				})
+				assert.ErrorAs(t, err, new(*apperror.ErrValidation))
+				mock.AssertExpectationsForObjects(t, repo, ghclient, notif)
+			})
+		}
+	})
+
+	t.Run("should return specific error if subscription already exists", func(t *testing.T) {
+		repo, ghclient, notif := setupMocks()
+		usecase := newSubscriptionUseCase(repo, ghclient, notif)
+
+		input := &SubscribeInput{
+			Email: "user@example.com",
+			Repo:  "owner/repo",
+		}
+
+		repo.On("SubscriptionExists", input.Email, input.Repo).Return(true, nil).Once()
+
+		err := usecase.Subscribe(input)
+		assert.ErrorIs(t, err, apperror.ErrSubscriptionAlreadyExists)
+		mock.AssertExpectationsForObjects(t, repo, ghclient, notif)
+	})
+
+	t.Run("should return specific error if repo not found on github", func(t *testing.T) {
+		repo, ghclient, notif := setupMocks()
+		usecase := newSubscriptionUseCase(repo, ghclient, notif)
+
+		input := &SubscribeInput{
+			Email: "user@example.com",
+			Repo:  "owner/repo",
+		}
+
+		repo.On("SubscriptionExists", input.Email, input.Repo).Return(false, nil).Once()
+		ghclient.On("RepoExists", input.Repo).Return(&apperror.ErrResourceNotFound{}).Once()
+
+		err := usecase.Subscribe(input)
+		assert.ErrorAs(t, err, new(*apperror.ErrResourceNotFound))
+		mock.AssertExpectationsForObjects(t, repo, ghclient, notif)
+	})
+
+	t.Run("no error if repo has no releases yet", func(t *testing.T) {
+		repo, ghclient, notif := setupMocks()
+		usecase := newSubscriptionUseCase(repo, ghclient, notif)
+
+		input := &SubscribeInput{
+			Email: "user@example.com",
+			Repo:  "owner/repo",
+		}
+		var noReleases *string
+		createdRepo := model.Repo{ID: 100, Repo: input.Repo, LastSeenTag: ""}
+
+		repo.On("SubscriptionExists", input.Email, input.Repo).Return(false, nil).Once()
+		ghclient.
+			On("RepoExists", input.Repo).Return(nil).Once().
+			On("GetLatestRelease", input.Repo).Return(noReleases, apperror.ErrGithubRepoNoReleases).Once()
+		repo.
+			On("GetOrCreateRepo", input.Repo, noReleases).Return(createdRepo, nil).
+			On("CreateSubscription", input.Email, createdRepo.ID, ANY).Return(nil).Once()
+		notif.On("SendConfirmation", input.Email, input.Repo, ANY).Return(nil).Once()
+
+		err := usecase.Subscribe(input)
+		assert.NoError(t, err)
+		mock.AssertExpectationsForObjects(t, repo, ghclient, notif)
+	})
 }
 
-func TestSubscribeConfirmationEmailFails(t *testing.T) {
-	notif := mock.IdealNotifier()
-	notif.SendConfirmationFunc = func(recipient, repo, confirmToken, unsubscribeToken string) error {
-		return errors.New("smtp error")
-	}
+func TestSubscriptionUseCase_Confirm(t *testing.T) {
+	t.Run("confirm success with valid token", func(t *testing.T) {
+		repo, ghclient, notif := setupMocks()
+		usecase := newSubscriptionUseCase(repo, ghclient, notif)
 
-	svc := newService(mock.IdealRepository(), mock.IdealGithubClient(), notif)
-	err := svc.Subscribe(&SubscribeInput{Email: "user@example.com", Repo: "owner/repo"})
-	if err == nil {
-		t.Error("expected error when email fails, got nil")
-	}
+		for i, token := range validTokens {
+			t.Run(fmt.Sprintf("valid token %d", i+1), func(t *testing.T) {
+				repo.On("ConfirmSubscription", token).Return(nil).Once()
+				err := usecase.Confirm(token)
+				assert.NoError(t, err)
+				mock.AssertExpectationsForObjects(t, repo, ghclient, notif)
+			})
+		}
+	})
+
+	t.Run("should return specific error if token format is invalid", func(t *testing.T) {
+		repo, ghclient, notif := setupMocks()
+		usecase := newSubscriptionUseCase(repo, ghclient, notif)
+
+		for _, tt := range invalidTokens {
+			t.Run(tt.name, func(t *testing.T) {
+				err := usecase.Confirm(tt.token)
+				assert.ErrorAs(t, err, new(*apperror.ErrInvalidResource))
+				mock.AssertExpectationsForObjects(t, repo, ghclient, notif)
+			})
+		}
+	})
+
+	t.Run("should return specific error if token not found", func(t *testing.T) {
+		repo, ghclient, notif := setupMocks()
+		usecase := newSubscriptionUseCase(repo, ghclient, notif)
+
+		repo.On("ConfirmSubscription", validTokens[0]).Return(apperror.ErrNotFound).Once()
+
+		err := usecase.Confirm(validTokens[0])
+		assert.ErrorAs(t, err, new(*apperror.ErrResourceNotFound))
+		mock.AssertExpectationsForObjects(t, repo, ghclient, notif)
+	})
 }
 
-// Confirm tests
-func TestConfirmSuccess(t *testing.T) {
-	svc := newService(mock.IdealRepository(), mock.IdealGithubClient(), mock.IdealNotifier())
+func TestSubscriptionUseCase_Unsubscribe(t *testing.T) {
+	t.Run("unsubscribe success with valid token", func(t *testing.T) {
+		repo, ghclient, notif := setupMocks()
+		usecase := newSubscriptionUseCase(repo, ghclient, notif)
 
-	for i, token := range validTokens {
-		t.Run(fmt.Sprintf("valid token %d", i+1), func(t *testing.T) {
-			err := svc.Confirm(token)
-			if err != nil {
-				t.Errorf("expected no error for token %q, got: %v", token, err)
-			}
-		})
-	}
+		for i, token := range validTokens {
+			t.Run(fmt.Sprintf("valid token %d", i+1), func(t *testing.T) {
+				repo.On("DeleteSubscription", token).Return(nil).Once()
+
+				err := usecase.Unsubscribe(token)
+				assert.NoError(t, err)
+				mock.AssertExpectationsForObjects(t, repo, ghclient, notif)
+			})
+		}
+	})
+
+	t.Run("should return specific error if token format is invalid", func(t *testing.T) {
+		repo, ghclient, notif := setupMocks()
+		usecase := newSubscriptionUseCase(repo, ghclient, notif)
+
+		for _, tt := range invalidTokens {
+			t.Run(tt.name, func(t *testing.T) {
+				err := usecase.Unsubscribe(tt.token)
+				assert.ErrorAs(t, err, new(*apperror.ErrInvalidResource))
+				mock.AssertExpectationsForObjects(t, repo, ghclient, notif)
+			})
+		}
+	})
+
+	t.Run("should return specific error if token not found", func(t *testing.T) {
+		repo, ghclient, notif := setupMocks()
+		usecase := newSubscriptionUseCase(repo, ghclient, notif)
+
+		repo.On("DeleteSubscription", validTokens[0]).Return(apperror.ErrNotFound).Once()
+
+		err := usecase.Unsubscribe(validTokens[0])
+		assert.ErrorAs(t, err, new(*apperror.ErrResourceNotFound))
+		mock.AssertExpectationsForObjects(t, repo, ghclient, notif)
+	})
 }
 
-func TestConfirmInvalidToken(t *testing.T) {
-	svc := newService(mock.IdealRepository(), mock.IdealGithubClient(), mock.IdealNotifier())
+func TestSubscriptionUseCase_GetSubscriptions(t *testing.T) {
+	t.Run("get subscriptions success path", func(t *testing.T) {
+		repo, ghclient, notif := setupMocks()
+		usecase := newSubscriptionUseCase(repo, ghclient, notif)
 
-	for _, tt := range invalidTokens {
-		t.Run(tt.name, func(t *testing.T) {
-			err := svc.Confirm(tt.token)
-			if _, ok := errors.AsType[*apperror.ErrInvalidResource](err); !ok {
-				t.Errorf("expected *ErrInvalidResource for %s, got: %T", tt.token, err)
-			}
-		})
-	}
-}
+		input := "user@example.com"
+		dbsubs := []model.Subscription{
+			{Email: "user@example.com", Repo: "owner1/repo1", Confirmed: true, LastSeenTag: "v.1.0.0"},
+			{Email: "user@example.com", Repo: "owner2/repo2", Confirmed: false, LastSeenTag: "v.1.0.0"},
+			{Email: "user@example.com", Repo: "owner3/repo3", Confirmed: false, LastSeenTag: "v.1.0.0"},
+		}
 
-func TestConfirmTokenNotFound(t *testing.T) {
-	repo := &mock.MockRepository{
-		ConfirmSubscriptionFunc: func(confirmToken string) error { return apperror.ErrNotFound },
-	}
+		repo.On("GetSubscriptionsByEmail", input).Return(dbsubs, nil).Once()
 
-	svc := newService(repo, mock.IdealGithubClient(), mock.IdealNotifier())
-	err := svc.Confirm(validTokens[0])
-	if _, ok := errors.AsType[*apperror.ErrResourceNotFound](err); !ok {
-		t.Errorf("expected *ErrResourceNotFound, got: %T", err)
-	}
-}
+		subs, err := usecase.GetSubscriptions(input)
 
-// Unsubscribe tests
-func TestUnsubscribeSuccess(t *testing.T) {
-	svc := newService(mock.IdealRepository(), mock.IdealGithubClient(), mock.IdealNotifier())
+		assert.NoError(t, err)
+		assert.Equal(t, dbsubs, subs)
+		mock.AssertExpectationsForObjects(t, repo, ghclient, notif)
+	})
 
-	for i, token := range validTokens {
-		t.Run(fmt.Sprintf("valid token %d", i+1), func(t *testing.T) {
-			err := svc.Unsubscribe(token)
-			if err != nil {
-				t.Errorf("expected no error for token %q, got: %v", token, err)
-			}
-		})
-	}
-}
+	t.Run("should return specific error if email format is invalid", func(t *testing.T) {
+		repo, ghclient, notif := setupMocks()
+		usecase := newSubscriptionUseCase(repo, ghclient, notif)
 
-func TestUnsubscribeInvalidToken(t *testing.T) {
-	svc := newService(mock.IdealRepository(), mock.IdealGithubClient(), mock.IdealNotifier())
-
-	for _, tt := range invalidTokens {
-		t.Run(tt.name, func(t *testing.T) {
-			err := svc.Unsubscribe(tt.token)
-			if _, ok := errors.AsType[*apperror.ErrInvalidResource](err); !ok {
-				t.Errorf("expected *ErrInvalidResource for %s, got: %T", tt.token, err)
-			}
-		})
-	}
-}
-
-func TestUnsubscribeTokenNotFound(t *testing.T) {
-	repo := &mock.MockRepository{
-		DeleteSubscriptionFunc: func(unsubscribeToken string) error { return apperror.ErrNotFound },
-	}
-
-	svc := newService(repo, mock.IdealGithubClient(), mock.IdealNotifier())
-	err := svc.Unsubscribe(validTokens[0])
-	if _, ok := errors.AsType[*apperror.ErrResourceNotFound](err); !ok {
-		t.Errorf("expected *ErrResourceNotFound, got: %T", err)
-	}
-}
-
-// GetSubscriptions tests
-func TestGetSubscriptionsSuccess(t *testing.T) {
-	repo := &mock.MockRepository{
-		GetSubscriptionsByEmailFunc: func(email string) ([]model.Subscription, error) {
-			return []model.Subscription{
-				{Email: "user@example.com", Repo: "owner1/repo1", Confirmed: true, LastSeenTag: "v.1.0.0"},
-				{Email: "user@example.com", Repo: "owner2/repo2", Confirmed: false, LastSeenTag: "v.1.0.0"},
-				{Email: "user@example.com", Repo: "owner3/repo3", Confirmed: false, LastSeenTag: "v.1.0.0"},
-			}, nil
-		},
-	}
-
-	svc := newService(repo, mock.IdealGithubClient(), mock.IdealNotifier())
-	subs, err := svc.GetSubscriptions("user@example.com")
-	if err != nil {
-		t.Errorf("expected no error, got: %v", err)
-	}
-	if len(subs) != 3 {
-		t.Errorf("expected 3 subscription, got %d", len(subs))
-	}
-}
-
-func TestGetSubscriptionsInvalidEmail(t *testing.T) {
-	svc := newService(mock.IdealRepository(), mock.IdealGithubClient(), mock.IdealNotifier())
-
-	for _, tt := range invalidEmails {
-		t.Run(tt.name, func(t *testing.T) {
-			_, err := svc.GetSubscriptions(tt.email)
-			if _, ok := errors.AsType[*apperror.ErrInvalidResource](err); !ok {
-				t.Errorf("expected *ErrInvalidResource for %s, got: %T", tt.email, err)
-			}
-		})
-	}
-}
-
-func TestGetSubscriptionsRepoError(t *testing.T) {
-	repo := &mock.MockRepository{
-		GetSubscriptionsByEmailFunc: func(email string) ([]model.Subscription, error) {
-			return nil, errors.New("db error")
-		},
-	}
-
-	svc := newService(repo, mock.IdealGithubClient(), mock.IdealNotifier())
-	_, err := svc.GetSubscriptions("user@example.com")
-	if err == nil {
-		t.Error("expected error, got nil")
-	}
+		for _, tt := range invalidEmails {
+			t.Run(tt.name, func(t *testing.T) {
+				_, err := usecase.GetSubscriptions(tt.email)
+				assert.ErrorAs(t, err, new(*apperror.ErrInvalidResource))
+				mock.AssertExpectationsForObjects(t, repo, ghclient, notif)
+			})
+		}
+	})
 }

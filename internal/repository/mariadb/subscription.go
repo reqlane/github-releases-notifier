@@ -1,8 +1,6 @@
 package mariadb
 
 import (
-	"errors"
-
 	"github.com/reqlane/github-releases-notifier/internal/apperror"
 	"github.com/reqlane/github-releases-notifier/internal/contract"
 	"github.com/reqlane/github-releases-notifier/internal/entity"
@@ -19,25 +17,39 @@ func NewSubscriptionRepo(db *gorm.DB) contract.SubscriptionRepo {
 }
 
 func (r *mariadbSubscriptionRepo) GetSubscriptionsByEmail(email string) ([]model.Subscription, error) {
-	subscriptions := make([]model.Subscription, 0)
+	var rows []entity.Subscription
 	result := r.db.
-		Select(`subscriptions.email, Repo.repo, subscriptions.confirmed, Repo.last_seen_tag`).
 		Model(&entity.Subscription{}).
 		InnerJoins("Repo").
-		Where(`subscriptions.email = ?`, email).
-		Scan(&subscriptions)
+		Where(entity.Subscription{Email: email}).
+		Scan(&rows)
 	if result.Error != nil {
 		return nil, result.Error
 	}
+
+	subscriptions := make([]model.Subscription, len(rows))
+	for i, row := range rows {
+		lastSeenTagValue := ""
+		if row.Repo.LastSeenTag != nil {
+			lastSeenTagValue = *row.Repo.LastSeenTag
+		}
+		subscriptions[i] = model.Subscription{
+			Email:       row.Email,
+			Repo:        row.Repo.Repo,
+			Confirmed:   row.Confirmed,
+			LastSeenTag: lastSeenTagValue,
+		}
+	}
+
 	return subscriptions, nil
 }
 
-func (r *mariadbSubscriptionRepo) CreateSubscription(email string, repoID uint, confirmToken, unsubscribeToken string) error {
+func (r *mariadbSubscriptionRepo) CreateSubscription(email string, repoID uint, tokens model.SubscriptionTokens) error {
 	subscription := entity.Subscription{
 		Email:            email,
 		RepoID:           repoID,
-		ConfirmToken:     &confirmToken,
-		UnsubscribeToken: unsubscribeToken,
+		ConfirmToken:     &tokens.ConfirmToken,
+		UnsubscribeToken: tokens.UnsubscribeToken,
 	}
 	return r.db.Create(&subscription).Error
 }
@@ -54,7 +66,7 @@ func (r *mariadbSubscriptionRepo) SubscriptionExists(email string, repoName stri
 func (r *mariadbSubscriptionRepo) ConfirmSubscription(confirmToken string) error {
 	result := r.db.
 		Model(&entity.Subscription{}).
-		Where(`confirm_token = ?`, confirmToken).
+		Where(entity.Subscription{ConfirmToken: &confirmToken}).
 		Updates(map[string]any{"confirmed": true, "confirm_token": nil})
 	if result.Error != nil {
 		return result.Error
@@ -67,7 +79,7 @@ func (r *mariadbSubscriptionRepo) ConfirmSubscription(confirmToken string) error
 
 func (r *mariadbSubscriptionRepo) DeleteSubscription(unsubscribeToken string) error {
 	result := r.db.
-		Where(`unsubscribe_token = ?`, unsubscribeToken).
+		Where(entity.Subscription{UnsubscribeToken: unsubscribeToken}).
 		Delete(&entity.Subscription{})
 	if result.Error != nil {
 		return result.Error
@@ -78,46 +90,40 @@ func (r *mariadbSubscriptionRepo) DeleteSubscription(unsubscribeToken string) er
 	return nil
 }
 
-func (r *mariadbSubscriptionRepo) GetRepoByName(repoName string) (model.Repo, error) {
+func (r *mariadbSubscriptionRepo) GetOrCreateRepo(repoName string, lastSeenTag *string) (model.Repo, error) {
 	var repo entity.Repo
 	result := r.db.
-		Where(`repo = ?`, repoName).
-		First(&repo)
+		Where(entity.Repo{Repo: repoName}).
+		Attrs(entity.Repo{LastSeenTag: lastSeenTag}).
+		FirstOrCreate(&repo)
 	if result.Error != nil {
-		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			return model.Repo{}, apperror.ErrNotFound
-		}
 		return model.Repo{}, result.Error
 	}
-	return model.Repo{ID: repo.ID, Repo: repo.Repo, LastSeenTag: repo.LastSeenTag}, nil
-}
-
-func (r *mariadbSubscriptionRepo) CreateRepo(repoName, lastSeenTag string) (model.Repo, error) {
-	repo := entity.Repo{Repo: repoName, LastSeenTag: lastSeenTag}
-	result := r.db.Create(&repo)
-	if result.Error != nil {
-		if errors.Is(result.Error, gorm.ErrDuplicatedKey) {
-			return model.Repo{}, apperror.ErrAlreadyExists
-		}
-		return model.Repo{}, result.Error
+	lastSeenTagValue := ""
+	if repo.LastSeenTag != nil {
+		lastSeenTagValue = *repo.LastSeenTag
 	}
-	return model.Repo{ID: repo.ID, Repo: repo.Repo, LastSeenTag: repo.LastSeenTag}, nil
+	return model.Repo{ID: repo.ID, Repo: repo.Repo, LastSeenTag: lastSeenTagValue}, nil
 }
 
 func (r *mariadbSubscriptionRepo) GetSubscribedRepos() ([]model.Repo, error) {
-	repos := make([]entity.Repo, 0)
+	var rows []entity.Repo
 	result := r.db.
 		Where(`EXISTS (SELECT 1 FROM subscriptions WHERE repo_id=repos.id AND confirmed=true)`).
-		Find(&repos)
+		Find(&rows)
 	if result.Error != nil {
 		return nil, result.Error
 	}
 
-	models := make([]model.Repo, len(repos))
-	for i, e := range repos {
-		models[i] = model.Repo{ID: e.ID, Repo: e.Repo, LastSeenTag: e.LastSeenTag}
+	repos := make([]model.Repo, len(rows))
+	for i, e := range rows {
+		lastSeenTagValue := ""
+		if e.LastSeenTag != nil {
+			lastSeenTagValue = *e.LastSeenTag
+		}
+		repos[i] = model.Repo{ID: e.ID, Repo: e.Repo, LastSeenTag: lastSeenTagValue}
 	}
-	return models, nil
+	return repos, nil
 }
 
 func (r *mariadbSubscriptionRepo) GetNotificationTargetsByRepo(repoID uint) ([]model.NotificationTarget, error) {
@@ -125,7 +131,7 @@ func (r *mariadbSubscriptionRepo) GetNotificationTargetsByRepo(repoID uint) ([]m
 	result := r.db.
 		Select(`email, unsubscribe_token`).
 		Model(&entity.Subscription{}).
-		Where(`repo_id = ? AND confirmed = true`, repoID).
+		Where(entity.Subscription{RepoID: repoID, Confirmed: true}).
 		Scan(&targets)
 	if result.Error != nil {
 		return nil, result.Error
@@ -133,7 +139,7 @@ func (r *mariadbSubscriptionRepo) GetNotificationTargetsByRepo(repoID uint) ([]m
 	return targets, nil
 }
 
-func (r *mariadbSubscriptionRepo) UpdateLastSeenTag(repoID uint, tag string) error {
+func (r *mariadbSubscriptionRepo) UpdateLastSeenTag(repoID uint, tag *string) error {
 	return r.db.
 		Model(&entity.Repo{ID: repoID}).
 		Update("last_seen_tag", tag).

@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/reqlane/github-releases-notifier/internal/contract"
+	"github.com/reqlane/github-releases-notifier/internal/model"
 	gomailv2 "gopkg.in/mail.v2"
 )
 
@@ -24,11 +25,11 @@ func NewNotifier(c GomailNotifierConfig) contract.Notifier {
 	return &gomailNotifier{dialer: gomailv2.NewDialer(c.Host, c.Port, c.Username, c.Password), serverBaseURL: c.ServerBaseURL}
 }
 
-func (n *gomailNotifier) SendConfirmation(recipient, repo, confirmToken, unsubscribeToken string) error {
+func (n *gomailNotifier) SendConfirmation(recipient, repo string, tokens model.SubscriptionTokens) error {
 	subject := fmt.Sprintf("Confirm your subscription to %s", repo)
 	repoURL := fmt.Sprintf("https://github.com/%s", repo)
-	confirmURL := fmt.Sprintf("%s/api/confirm/%s", n.serverBaseURL, confirmToken)
-	unsubscribeURL := fmt.Sprintf("%s/api/unsubscribe/%s", n.serverBaseURL, unsubscribeToken)
+	confirmURL := fmt.Sprintf("%s/api/confirm/%s", n.serverBaseURL, tokens.ConfirmToken)
+	unsubscribeURL := fmt.Sprintf("%s/api/unsubscribe/%s", n.serverBaseURL, tokens.UnsubscribeToken)
 	body := fmt.Sprintf(
 		"You requested to subscribe to new releases notifications for the Github repository:\n"+
 			"%s\n\n"+

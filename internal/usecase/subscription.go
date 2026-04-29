@@ -51,41 +51,20 @@ func (s *subscriptionUseCase) Subscribe(input *SubscribeInput) error {
 	}
 
 	// Create repo record if not tracked yet
-	trackedRepo, err := s.repo.GetRepoByName(input.Repo)
-	if err != nil && !errors.Is(err, apperror.ErrNotFound) {
-		return err
-	}
-	if errors.Is(err, apperror.ErrNotFound) {
-		trackedRepo, err = s.repo.CreateRepo(input.Repo, lastSeenTag)
-		if err != nil {
-			// possible race condition
-			if errors.Is(err, apperror.ErrAlreadyExists) {
-				trackedRepo, err = s.repo.GetRepoByName(input.Repo)
-				if err != nil {
-					return err
-				}
-			} else {
-				return err
-			}
-		}
-	}
+	trackedRepo, err := s.repo.GetOrCreateRepo(input.Repo, lastSeenTag)
 
 	// Create subscription
-	confirmToken, err := generateToken()
+	tokens, err := generateSubscriptionTokens()
 	if err != nil {
 		return err
 	}
-	unsubscribeToken, err := generateToken()
-	if err != nil {
-		return err
-	}
-	err = s.repo.CreateSubscription(input.Email, trackedRepo.ID, confirmToken, unsubscribeToken)
+	err = s.repo.CreateSubscription(input.Email, trackedRepo.ID, tokens)
 	if err != nil {
 		return err
 	}
 
 	// Send confirmation email
-	err = s.notif.SendConfirmation(input.Email, input.Repo, confirmToken, unsubscribeToken)
+	err = s.notif.SendConfirmation(input.Email, input.Repo, tokens)
 	if err != nil {
 		return err
 	}
@@ -136,6 +115,22 @@ func (s *subscriptionUseCase) GetSubscriptions(email string) ([]model.Subscripti
 	}
 
 	return subscriptions, nil
+}
+
+func generateSubscriptionTokens() (model.SubscriptionTokens, error) {
+	confirmToken, err := generateToken()
+	if err != nil {
+		return model.SubscriptionTokens{}, err
+	}
+	unsubscribeToken, err := generateToken()
+	if err != nil {
+		return model.SubscriptionTokens{}, err
+	}
+	tokens := model.SubscriptionTokens{
+		ConfirmToken:     confirmToken,
+		UnsubscribeToken: unsubscribeToken,
+	}
+	return tokens, nil
 }
 
 func generateToken() (string, error) {
