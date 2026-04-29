@@ -98,7 +98,7 @@ func (s *FixedRateScanner) scan() {
 
 func (s *FixedRateScanner) checkRepo(repo model.Repo) {
 	tag, err := s.githubClient.GetLatestRelease(repo.Repo)
-	if err != nil && !errors.Is(err, apperror.ErrGithubRepoNoReleases) {
+	if err != nil {
 		if e, ok := errors.AsType[*apperror.ErrGithubAPIRateLimited](err); ok {
 			s.logger.Warn().Time("reset time", e.ResetTime).Msg("rate limited, sent pause signal to scanner")
 			s.pauseCh <- e.ResetTime

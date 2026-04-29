@@ -46,7 +46,7 @@ func (s *subscriptionUseCase) Subscribe(input *SubscribeInput) error {
 
 	// Get latest release
 	lastSeenTag, err := s.githubClient.GetLatestRelease(input.Repo)
-	if err != nil && !errors.Is(err, apperror.ErrGithubRepoNoReleases) {
+	if err != nil {
 		return err
 	}
 

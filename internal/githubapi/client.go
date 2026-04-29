@@ -122,7 +122,7 @@ func (g *client) GetLatestRelease(repo string) (*string, error) {
 		}
 		return nil, apperror.ErrGithubForbidden
 	case http.StatusNotFound:
-		return nil, apperror.ErrGithubRepoNoReleases
+		return nil, nil
 	case http.StatusTooManyRequests:
 		t := g.handleRateLimit(resp)
 		return nil, &apperror.ErrGithubAPIRateLimited{ResetTime: t}

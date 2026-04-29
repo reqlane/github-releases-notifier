@@ -178,7 +178,7 @@ func TestSubscriptionUseCase_Subscribe(t *testing.T) {
 		repo.On("SubscriptionExists", input.Email, input.Repo).Return(false, nil).Once()
 		ghclient.
 			On("RepoExists", input.Repo).Return(nil).Once().
-			On("GetLatestRelease", input.Repo).Return(noReleases, apperror.ErrGithubRepoNoReleases).Once()
+			On("GetLatestRelease", input.Repo).Return(noReleases, nil).Once()
 		repo.
 			On("GetOrCreateRepo", input.Repo, noReleases).Return(createdRepo, nil).
 			On("CreateSubscription", input.Email, createdRepo.ID, ANY).Return(nil).Once()

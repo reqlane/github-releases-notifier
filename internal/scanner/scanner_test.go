@@ -117,7 +117,7 @@ func TestScanner_CheckRepo(t *testing.T) {
 
 		input := model.Repo{Repo: "owner/repo", LastSeenTag: "v1.0.0"}
 
-		ghclient.On("GetLatestRelease", input.Repo).Return((*string)(nil), apperror.ErrGithubRepoNoReleases).Once()
+		ghclient.On("GetLatestRelease", input.Repo).Return((*string)(nil), nil).Once()
 
 		s.checkRepo(input)
 

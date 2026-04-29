@@ -10,7 +10,6 @@ import (
 var (
 	ErrNotFound                  = errors.New("not found")
 	ErrAlreadyExists             = errors.New("resource already exists")
-	ErrGithubRepoNoReleases      = errors.New("github repo has no releases yet")
 	ErrGithubForbidden           = errors.New("403 forbidden response from github api")
 	ErrInvalidGithubAPIToken     = errors.New("invalid github api token in server configuration")
 	ErrSubscriptionAlreadyExists = errors.New("subscription already exists")
