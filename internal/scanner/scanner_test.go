@@ -1,7 +1,6 @@
 package scanner
 
 import (
-	"errors"
 	"io"
 	"testing"
 	"time"
@@ -41,7 +40,7 @@ func newScanner(r *mockrepository.SubscriptionRepo, g *mockgithubapi.GithubClien
 }
 
 func TestScanner_Scan(t *testing.T) {
-	t.Run("shouldn't call github when no repos are subscribed", func(t *testing.T) {
+	t.Run("no subscribed repos", func(t *testing.T) {
 		repo, ghclient, notif := setupMocks()
 		s := newScanner(repo, ghclient, notif)
 
@@ -53,11 +52,11 @@ func TestScanner_Scan(t *testing.T) {
 		mock.AssertExpectationsForObjects(t, repo, ghclient, notif)
 	})
 
-	t.Run("shouldn't call github on database error", func(t *testing.T) {
+	t.Run("database error", func(t *testing.T) {
 		repo, ghclient, notif := setupMocks()
 		s := newScanner(repo, ghclient, notif)
 
-		repo.On("GetSubscribedRepos").Return(nil, errors.New("db error")).Once()
+		repo.On("GetSubscribedRepos").Return(nil, assert.AnError).Once()
 
 		s.scan()
 
@@ -67,7 +66,7 @@ func TestScanner_Scan(t *testing.T) {
 }
 
 func TestScanner_CheckRepo(t *testing.T) {
-	t.Run("should notify all and update tag if a new release is found", func(t *testing.T) {
+	t.Run("a new release is found", func(t *testing.T) {
 		repo, ghclient, notif := setupMocks()
 		s := newScanner(repo, ghclient, notif)
 
@@ -96,7 +95,7 @@ func TestScanner_CheckRepo(t *testing.T) {
 		mock.AssertExpectationsForObjects(t, repo, ghclient, notif)
 	})
 
-	t.Run("should neither update tag neither notify if release tag is unchanged", func(t *testing.T) {
+	t.Run("release tag is unchanged", func(t *testing.T) {
 		repo, ghclient, notif := setupMocks()
 		s := newScanner(repo, ghclient, notif)
 
@@ -111,13 +110,13 @@ func TestScanner_CheckRepo(t *testing.T) {
 		mock.AssertExpectationsForObjects(t, repo, ghclient, notif)
 	})
 
-	t.Run("should neither update tag neither notify if no releases found", func(t *testing.T) {
+	t.Run("no releases found", func(t *testing.T) {
 		repo, ghclient, notif := setupMocks()
 		s := newScanner(repo, ghclient, notif)
 
 		input := model.Repo{Repo: "owner/repo", LastSeenTag: "v1.0.0"}
 
-		ghclient.On("GetLatestRelease", input.Repo).Return((*string)(nil), nil).Once()
+		ghclient.On("GetLatestRelease", input.Repo).Return(nil, nil).Once()
 
 		s.checkRepo(input)
 
@@ -126,7 +125,7 @@ func TestScanner_CheckRepo(t *testing.T) {
 		mock.AssertExpectationsForObjects(t, repo, ghclient, notif)
 	})
 
-	t.Run("should not notify if tag update fails", func(t *testing.T) {
+	t.Run("tag update fails", func(t *testing.T) {
 		repo, ghclient, notif := setupMocks()
 		s := newScanner(repo, ghclient, notif)
 
@@ -134,7 +133,7 @@ func TestScanner_CheckRepo(t *testing.T) {
 		newRelease := "v2.0.0"
 
 		ghclient.On("GetLatestRelease", input.Repo).Return(&newRelease, nil).Once()
-		repo.On("UpdateLastSeenTag", input.ID, &newRelease).Return(errors.New("db error")).Once()
+		repo.On("UpdateLastSeenTag", input.ID, &newRelease).Return(assert.AnError).Once()
 
 		s.checkRepo(input)
 
@@ -142,7 +141,7 @@ func TestScanner_CheckRepo(t *testing.T) {
 		mock.AssertExpectationsForObjects(t, repo, ghclient, notif)
 	})
 
-	t.Run("should skip notification if targets fetching fails", func(t *testing.T) {
+	t.Run("targets fetching fails", func(t *testing.T) {
 		repo, ghclient, notif := setupMocks()
 		s := newScanner(repo, ghclient, notif)
 
@@ -152,7 +151,7 @@ func TestScanner_CheckRepo(t *testing.T) {
 		ghclient.On("GetLatestRelease", input.Repo).Return(&newRelease, nil).Once()
 		repo.
 			On("UpdateLastSeenTag", input.ID, &newRelease).Return(nil).Once().
-			On("GetNotificationTargetsByRepo", input.ID).Return(nil, errors.New("db error")).Once()
+			On("GetNotificationTargetsByRepo", input.ID).Return(nil, assert.AnError).Once()
 
 		s.checkRepo(input)
 
@@ -160,7 +159,7 @@ func TestScanner_CheckRepo(t *testing.T) {
 		mock.AssertExpectationsForObjects(t, repo, ghclient, notif)
 	})
 
-	t.Run("should continue notifying others if one fails", func(t *testing.T) {
+	t.Run("notifications fail partially", func(t *testing.T) {
 		repo, ghclient, notif := setupMocks()
 		s := newScanner(repo, ghclient, notif)
 
@@ -177,7 +176,7 @@ func TestScanner_CheckRepo(t *testing.T) {
 			On("UpdateLastSeenTag", input.ID, &newRelease).Return(nil).Once().
 			On("GetNotificationTargetsByRepo", input.ID).Return(targets, nil).Once()
 		notif.
-			On("SendNotification", targets[0].Email, input.Repo, newRelease, ANY).Return(errors.New("smtp error")).Once().
+			On("SendNotification", targets[0].Email, input.Repo, newRelease, ANY).Return(assert.AnError).Once().
 			On("SendNotification", ANY, input.Repo, newRelease, ANY).Return(nil).Twice()
 
 		s.checkRepo(input)
@@ -186,15 +185,15 @@ func TestScanner_CheckRepo(t *testing.T) {
 	})
 }
 
-func TestScanner_RateLimiting(t *testing.T) {
-	t.Run("should send pause signal if github api returns rate limit error", func(t *testing.T) {
+func TestScanner_RateLimited(t *testing.T) {
+	t.Run("github api returns rate limit error", func(t *testing.T) {
 		repo, ghclient, notif := setupMocks()
 		s := newScanner(repo, ghclient, notif)
 
 		input := model.Repo{Repo: "owner/repo"}
 		resetTime := time.Now().Add(5 * time.Minute)
 
-		ghclient.On("GetLatestRelease", input.Repo).Return((*string)(nil), &apperror.ErrGithubAPIRateLimited{ResetTime: resetTime}).Once()
+		ghclient.On("GetLatestRelease", input.Repo).Return(nil, &apperror.ErrGithubAPIRateLimited{ResetTime: resetTime}).Once()
 
 		s.checkRepo(input)
 

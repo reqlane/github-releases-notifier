@@ -68,7 +68,7 @@ func newSubscriptionUseCase(r *mockrepository.SubscriptionRepo, g *mockgithubapi
 }
 
 func TestSubscriptionUseCase_Subscribe(t *testing.T) {
-	t.Run("subscribe success path", func(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
 		repo, ghclient, notif := setupMocks()
 		usecase := newSubscriptionUseCase(repo, ghclient, notif)
 
@@ -101,7 +101,7 @@ func TestSubscriptionUseCase_Subscribe(t *testing.T) {
 		mock.AssertExpectationsForObjects(t, repo, ghclient, notif)
 	})
 
-	t.Run("should return validation error if email format is invalid", func(t *testing.T) {
+	t.Run("invalid email format", func(t *testing.T) {
 		repo, ghclient, notif := setupMocks()
 		usecase := newSubscriptionUseCase(repo, ghclient, notif)
 		for _, tt := range invalidEmails {
@@ -116,7 +116,7 @@ func TestSubscriptionUseCase_Subscribe(t *testing.T) {
 		}
 	})
 
-	t.Run("should return validation error if repo format is invalid", func(t *testing.T) {
+	t.Run("invalid repo format", func(t *testing.T) {
 		repo, ghclient, notif := setupMocks()
 		usecase := newSubscriptionUseCase(repo, ghclient, notif)
 		for _, tt := range invalidRepos {
@@ -131,7 +131,7 @@ func TestSubscriptionUseCase_Subscribe(t *testing.T) {
 		}
 	})
 
-	t.Run("should return specific error if subscription already exists", func(t *testing.T) {
+	t.Run("subscription already exists", func(t *testing.T) {
 		repo, ghclient, notif := setupMocks()
 		usecase := newSubscriptionUseCase(repo, ghclient, notif)
 
@@ -147,7 +147,7 @@ func TestSubscriptionUseCase_Subscribe(t *testing.T) {
 		mock.AssertExpectationsForObjects(t, repo, ghclient, notif)
 	})
 
-	t.Run("should return specific error if repo not found on github", func(t *testing.T) {
+	t.Run("repo not found on github", func(t *testing.T) {
 		repo, ghclient, notif := setupMocks()
 		usecase := newSubscriptionUseCase(repo, ghclient, notif)
 
@@ -164,7 +164,7 @@ func TestSubscriptionUseCase_Subscribe(t *testing.T) {
 		mock.AssertExpectationsForObjects(t, repo, ghclient, notif)
 	})
 
-	t.Run("no error if repo has no releases yet", func(t *testing.T) {
+	t.Run("repo has no releases yet", func(t *testing.T) {
 		repo, ghclient, notif := setupMocks()
 		usecase := newSubscriptionUseCase(repo, ghclient, notif)
 
@@ -191,7 +191,7 @@ func TestSubscriptionUseCase_Subscribe(t *testing.T) {
 }
 
 func TestSubscriptionUseCase_Confirm(t *testing.T) {
-	t.Run("confirm success with valid token", func(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
 		repo, ghclient, notif := setupMocks()
 		usecase := newSubscriptionUseCase(repo, ghclient, notif)
 
@@ -205,7 +205,7 @@ func TestSubscriptionUseCase_Confirm(t *testing.T) {
 		}
 	})
 
-	t.Run("should return specific error if token format is invalid", func(t *testing.T) {
+	t.Run("invalid token format", func(t *testing.T) {
 		repo, ghclient, notif := setupMocks()
 		usecase := newSubscriptionUseCase(repo, ghclient, notif)
 
@@ -218,7 +218,7 @@ func TestSubscriptionUseCase_Confirm(t *testing.T) {
 		}
 	})
 
-	t.Run("should return specific error if token not found", func(t *testing.T) {
+	t.Run("token not found", func(t *testing.T) {
 		repo, ghclient, notif := setupMocks()
 		usecase := newSubscriptionUseCase(repo, ghclient, notif)
 
@@ -231,7 +231,7 @@ func TestSubscriptionUseCase_Confirm(t *testing.T) {
 }
 
 func TestSubscriptionUseCase_Unsubscribe(t *testing.T) {
-	t.Run("unsubscribe success with valid token", func(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
 		repo, ghclient, notif := setupMocks()
 		usecase := newSubscriptionUseCase(repo, ghclient, notif)
 
@@ -246,7 +246,7 @@ func TestSubscriptionUseCase_Unsubscribe(t *testing.T) {
 		}
 	})
 
-	t.Run("should return specific error if token format is invalid", func(t *testing.T) {
+	t.Run("invalid token format", func(t *testing.T) {
 		repo, ghclient, notif := setupMocks()
 		usecase := newSubscriptionUseCase(repo, ghclient, notif)
 
@@ -259,7 +259,7 @@ func TestSubscriptionUseCase_Unsubscribe(t *testing.T) {
 		}
 	})
 
-	t.Run("should return specific error if token not found", func(t *testing.T) {
+	t.Run("token not found", func(t *testing.T) {
 		repo, ghclient, notif := setupMocks()
 		usecase := newSubscriptionUseCase(repo, ghclient, notif)
 
@@ -272,15 +272,15 @@ func TestSubscriptionUseCase_Unsubscribe(t *testing.T) {
 }
 
 func TestSubscriptionUseCase_GetSubscriptions(t *testing.T) {
-	t.Run("get subscriptions success path", func(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
 		repo, ghclient, notif := setupMocks()
 		usecase := newSubscriptionUseCase(repo, ghclient, notif)
 
 		input := "user@example.com"
 		dbsubs := []model.Subscription{
 			{Email: "user@example.com", Repo: "owner1/repo1", Confirmed: true, LastSeenTag: "v.1.0.0"},
-			{Email: "user@example.com", Repo: "owner2/repo2", Confirmed: false, LastSeenTag: "v.1.0.0"},
-			{Email: "user@example.com", Repo: "owner3/repo3", Confirmed: false, LastSeenTag: "v.1.0.0"},
+			{Email: "user@example.com", Repo: "owner2/repo2", Confirmed: false, LastSeenTag: ""},
+			{Email: "user@example.com", Repo: "owner3/repo3", Confirmed: false, LastSeenTag: "v.3.0.0"},
 		}
 
 		repo.On("GetSubscriptionsByEmail", input).Return(dbsubs, nil).Once()
@@ -292,7 +292,7 @@ func TestSubscriptionUseCase_GetSubscriptions(t *testing.T) {
 		mock.AssertExpectationsForObjects(t, repo, ghclient, notif)
 	})
 
-	t.Run("should return specific error if email format is invalid", func(t *testing.T) {
+	t.Run("invalid email format", func(t *testing.T) {
 		repo, ghclient, notif := setupMocks()
 		usecase := newSubscriptionUseCase(repo, ghclient, notif)
 
