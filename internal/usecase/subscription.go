@@ -52,6 +52,9 @@ func (s *subscriptionUseCase) Subscribe(input *SubscribeInput) error {
 
 	// Create repo record if not tracked yet
 	trackedRepo, err := s.repo.GetOrCreateRepo(input.Repo, lastSeenTag)
+	if err != nil {
+		return err
+	}
 
 	// Create subscription
 	tokens, err := generateSubscriptionTokens()
