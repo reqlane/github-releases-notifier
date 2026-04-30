@@ -1,47 +1,23 @@
 package scanner
 
 import (
-	"io"
 	"testing"
 	"time"
 
 	"github.com/reqlane/github-releases-notifier/internal/apperror"
-	mockgithubapi "github.com/reqlane/github-releases-notifier/internal/mock/githubapi"
-	mocknotifier "github.com/reqlane/github-releases-notifier/internal/mock/notifier"
-	mockrepository "github.com/reqlane/github-releases-notifier/internal/mock/repository"
 	"github.com/reqlane/github-releases-notifier/internal/model"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
-// Helpers
-const (
-	ANY = mock.Anything
-)
-
-func setupMocks() (*mockrepository.SubscriptionRepo, *mockgithubapi.GithubClient, *mocknotifier.Notifier) {
-	return new(mockrepository.SubscriptionRepo),
-		new(mockgithubapi.GithubClient),
-		new(mocknotifier.Notifier)
-}
-
-func newScanner(r *mockrepository.SubscriptionRepo, g *mockgithubapi.GithubClient, n *mocknotifier.Notifier) *FixedRateScanner {
-	return &FixedRateScanner{
-		repo:           r,
-		githubClient:   g,
-		notif:          n,
-		logger:         zerolog.New(io.Discard), // no logs in tests
-		requestsPerMin: defaultRequestsPerMin,
-		sleepOnEmpty:   defaultSleepOnEmpty,
-		pauseCh:        make(chan time.Time, 3),
-		sleepFn:        func(time.Duration) {}, // no sleep in tests
-	}
-}
-
+// --- scan ---
 func TestScanner_Scan(t *testing.T) {
+	t.Parallel()
+
 	t.Run("no subscribed repos", func(t *testing.T) {
-		repo, ghclient, notif := setupMocks()
+		t.Parallel()
+
+		repo, ghclient, notif := scannerMocks()
 		s := newScanner(repo, ghclient, notif)
 
 		repo.On("GetSubscribedRepos").Return([]model.Repo{}, nil).Once()
@@ -53,7 +29,9 @@ func TestScanner_Scan(t *testing.T) {
 	})
 
 	t.Run("database error", func(t *testing.T) {
-		repo, ghclient, notif := setupMocks()
+		t.Parallel()
+
+		repo, ghclient, notif := scannerMocks()
 		s := newScanner(repo, ghclient, notif)
 
 		repo.On("GetSubscribedRepos").Return(nil, assert.AnError).Once()
@@ -65,9 +43,14 @@ func TestScanner_Scan(t *testing.T) {
 	})
 }
 
+// --- checkRepo ---
 func TestScanner_CheckRepo(t *testing.T) {
+	t.Parallel()
+
 	t.Run("a new release is found", func(t *testing.T) {
-		repo, ghclient, notif := setupMocks()
+		t.Parallel()
+
+		repo, ghclient, notif := scannerMocks()
 		s := newScanner(repo, ghclient, notif)
 
 		inputs := []model.Repo{
@@ -96,7 +79,9 @@ func TestScanner_CheckRepo(t *testing.T) {
 	})
 
 	t.Run("release tag is unchanged", func(t *testing.T) {
-		repo, ghclient, notif := setupMocks()
+		t.Parallel()
+
+		repo, ghclient, notif := scannerMocks()
 		s := newScanner(repo, ghclient, notif)
 
 		input := model.Repo{Repo: "owner/repo", LastSeenTag: "v1.0.0"}
@@ -111,7 +96,9 @@ func TestScanner_CheckRepo(t *testing.T) {
 	})
 
 	t.Run("no releases found", func(t *testing.T) {
-		repo, ghclient, notif := setupMocks()
+		t.Parallel()
+
+		repo, ghclient, notif := scannerMocks()
 		s := newScanner(repo, ghclient, notif)
 
 		input := model.Repo{Repo: "owner/repo", LastSeenTag: "v1.0.0"}
@@ -126,7 +113,9 @@ func TestScanner_CheckRepo(t *testing.T) {
 	})
 
 	t.Run("tag update fails", func(t *testing.T) {
-		repo, ghclient, notif := setupMocks()
+		t.Parallel()
+
+		repo, ghclient, notif := scannerMocks()
 		s := newScanner(repo, ghclient, notif)
 
 		input := model.Repo{Repo: "owner/repo", LastSeenTag: "v1.0.0"}
@@ -142,7 +131,9 @@ func TestScanner_CheckRepo(t *testing.T) {
 	})
 
 	t.Run("targets fetching fails", func(t *testing.T) {
-		repo, ghclient, notif := setupMocks()
+		t.Parallel()
+
+		repo, ghclient, notif := scannerMocks()
 		s := newScanner(repo, ghclient, notif)
 
 		input := model.Repo{Repo: "owner/repo", LastSeenTag: "v1.0.0"}
@@ -160,7 +151,9 @@ func TestScanner_CheckRepo(t *testing.T) {
 	})
 
 	t.Run("notifications fail partially", func(t *testing.T) {
-		repo, ghclient, notif := setupMocks()
+		t.Parallel()
+
+		repo, ghclient, notif := scannerMocks()
 		s := newScanner(repo, ghclient, notif)
 
 		input := model.Repo{Repo: "owner/repo", LastSeenTag: "v1.0.0"}
@@ -185,9 +178,14 @@ func TestScanner_CheckRepo(t *testing.T) {
 	})
 }
 
+// --- Rate limited ---
 func TestScanner_RateLimited(t *testing.T) {
+	t.Parallel()
+
 	t.Run("github api returns rate limit error", func(t *testing.T) {
-		repo, ghclient, notif := setupMocks()
+		t.Parallel()
+
+		repo, ghclient, notif := scannerMocks()
 		s := newScanner(repo, ghclient, notif)
 
 		input := model.Repo{Repo: "owner/repo"}

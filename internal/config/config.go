@@ -23,7 +23,7 @@ type Config struct {
 }
 
 func (c *Config) DSN() string {
-	return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", c.DBUser, c.DBPassword, c.DBHost, c.DBPort, c.DBName)
+	return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=True", c.DBUser, c.DBPassword, c.DBHost, c.DBPort, c.DBName)
 }
 
 func Load() (*Config, error) {

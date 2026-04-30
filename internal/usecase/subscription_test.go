@@ -2,74 +2,22 @@ package usecase
 
 import (
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/reqlane/github-releases-notifier/internal/apperror"
-	mockgithubapi "github.com/reqlane/github-releases-notifier/internal/mock/githubapi"
-	mocknotifier "github.com/reqlane/github-releases-notifier/internal/mock/notifier"
-	mockrepository "github.com/reqlane/github-releases-notifier/internal/mock/repository"
 	"github.com/reqlane/github-releases-notifier/internal/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
-// Helpers
-const (
-	ANY = mock.Anything
-)
-
-var (
-	invalidEmails = []struct {
-		name  string
-		email string
-	}{
-		{"empty email", ""},
-		{"missing @", "userexample.com"},
-		{"missing domain", "user@"},
-		{"missing local part", "@example.com"},
-		{"spaces", "user @example.com"},
-	}
-	invalidRepos = []struct {
-		name string
-		repo string
-	}{
-		{"missing slash", "ownerrepo"},
-		{"owner too long", strings.Repeat("a", 40) + "/repo"},
-		{"repo name too long", "owner/" + strings.Repeat("a", 101)},
-		{"starts with hyphen", "-owner/repo"},
-		{"double slash", "owner//repo"},
-	}
-	validTokens = []string{
-		"32d49477a4752b36bcaeed3a25249c4333eb04333971f5ddd5fa568337d038f1",
-		"aabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaabbccdd",
-		"aabbcca4752b3a1f5ddd5cddaabbccdb1f5fa568335fa56833eeeeeeeebbccdd",
-	}
-	invalidTokens = []struct {
-		name  string
-		token string
-	}{
-		{"empty token", ""},
-		{"too short", "aabbccdd"},
-		{"too long", "aabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaabbccdd00"},
-		{"non-hex characters", "zzbbaabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaabbccddaabb"},
-		{"correct length but spaces", "aabbccddaabbccdd aabbccddaabbccddaabbccddaabbccddaabbccddaabbcc"},
-	}
-)
-
-func setupMocks() (*mockrepository.SubscriptionRepo, *mockgithubapi.GithubClient, *mocknotifier.Notifier) {
-	return new(mockrepository.SubscriptionRepo),
-		new(mockgithubapi.GithubClient),
-		new(mocknotifier.Notifier)
-}
-
-func newSubscriptionUseCase(r *mockrepository.SubscriptionRepo, g *mockgithubapi.GithubClient, n *mocknotifier.Notifier) SubscriptionUseCase {
-	return NewSubscriptionUseCase(r, g, n)
-}
-
+// --- Subscribe ---
 func TestSubscriptionUseCase_Subscribe(t *testing.T) {
+	t.Parallel()
+
 	t.Run("success", func(t *testing.T) {
-		repo, ghclient, notif := setupMocks()
+		t.Parallel()
+
+		repo, ghclient, notif := subscriptionUseCaseMocks()
 		usecase := newSubscriptionUseCase(repo, ghclient, notif)
 
 		input := &SubscribeInput{
@@ -102,10 +50,14 @@ func TestSubscriptionUseCase_Subscribe(t *testing.T) {
 	})
 
 	t.Run("invalid email format", func(t *testing.T) {
-		repo, ghclient, notif := setupMocks()
-		usecase := newSubscriptionUseCase(repo, ghclient, notif)
+		t.Parallel()
+
 		for _, tt := range invalidEmails {
 			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+
+				repo, ghclient, notif := subscriptionUseCaseMocks()
+				usecase := newSubscriptionUseCase(repo, ghclient, notif)
 				err := usecase.Subscribe(&SubscribeInput{
 					Email: tt.email,
 					Repo:  "owner/repo",
@@ -117,10 +69,14 @@ func TestSubscriptionUseCase_Subscribe(t *testing.T) {
 	})
 
 	t.Run("invalid repo format", func(t *testing.T) {
-		repo, ghclient, notif := setupMocks()
-		usecase := newSubscriptionUseCase(repo, ghclient, notif)
+		t.Parallel()
+
 		for _, tt := range invalidRepos {
 			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+
+				repo, ghclient, notif := subscriptionUseCaseMocks()
+				usecase := newSubscriptionUseCase(repo, ghclient, notif)
 				err := usecase.Subscribe(&SubscribeInput{
 					Email: "user@example.com",
 					Repo:  tt.repo,
@@ -132,7 +88,9 @@ func TestSubscriptionUseCase_Subscribe(t *testing.T) {
 	})
 
 	t.Run("subscription already exists", func(t *testing.T) {
-		repo, ghclient, notif := setupMocks()
+		t.Parallel()
+
+		repo, ghclient, notif := subscriptionUseCaseMocks()
 		usecase := newSubscriptionUseCase(repo, ghclient, notif)
 
 		input := &SubscribeInput{
@@ -148,7 +106,9 @@ func TestSubscriptionUseCase_Subscribe(t *testing.T) {
 	})
 
 	t.Run("repo not found on github", func(t *testing.T) {
-		repo, ghclient, notif := setupMocks()
+		t.Parallel()
+
+		repo, ghclient, notif := subscriptionUseCaseMocks()
 		usecase := newSubscriptionUseCase(repo, ghclient, notif)
 
 		input := &SubscribeInput{
@@ -165,7 +125,9 @@ func TestSubscriptionUseCase_Subscribe(t *testing.T) {
 	})
 
 	t.Run("repo has no releases yet", func(t *testing.T) {
-		repo, ghclient, notif := setupMocks()
+		t.Parallel()
+
+		repo, ghclient, notif := subscriptionUseCaseMocks()
 		usecase := newSubscriptionUseCase(repo, ghclient, notif)
 
 		input := &SubscribeInput{
@@ -190,14 +152,22 @@ func TestSubscriptionUseCase_Subscribe(t *testing.T) {
 	})
 }
 
+// --- Confirm ---
 func TestSubscriptionUseCase_Confirm(t *testing.T) {
+	t.Parallel()
+
 	t.Run("success", func(t *testing.T) {
-		repo, ghclient, notif := setupMocks()
-		usecase := newSubscriptionUseCase(repo, ghclient, notif)
+		t.Parallel()
 
 		for i, token := range validTokens {
 			t.Run(fmt.Sprintf("valid token %d", i+1), func(t *testing.T) {
+				t.Parallel()
+
+				repo, ghclient, notif := subscriptionUseCaseMocks()
+				usecase := newSubscriptionUseCase(repo, ghclient, notif)
+
 				repo.On("ConfirmSubscription", token).Return(nil).Once()
+
 				err := usecase.Confirm(token)
 				assert.NoError(t, err)
 				mock.AssertExpectationsForObjects(t, repo, ghclient, notif)
@@ -206,11 +176,15 @@ func TestSubscriptionUseCase_Confirm(t *testing.T) {
 	})
 
 	t.Run("invalid token format", func(t *testing.T) {
-		repo, ghclient, notif := setupMocks()
-		usecase := newSubscriptionUseCase(repo, ghclient, notif)
+		t.Parallel()
 
 		for _, tt := range invalidTokens {
 			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+
+				repo, ghclient, notif := subscriptionUseCaseMocks()
+				usecase := newSubscriptionUseCase(repo, ghclient, notif)
+
 				err := usecase.Confirm(tt.token)
 				assert.ErrorAs(t, err, new(*apperror.ErrInvalidResource))
 				mock.AssertExpectationsForObjects(t, repo, ghclient, notif)
@@ -219,7 +193,9 @@ func TestSubscriptionUseCase_Confirm(t *testing.T) {
 	})
 
 	t.Run("token not found", func(t *testing.T) {
-		repo, ghclient, notif := setupMocks()
+		t.Parallel()
+
+		repo, ghclient, notif := subscriptionUseCaseMocks()
 		usecase := newSubscriptionUseCase(repo, ghclient, notif)
 
 		repo.On("ConfirmSubscription", validTokens[0]).Return(apperror.ErrNotFound).Once()
@@ -230,13 +206,20 @@ func TestSubscriptionUseCase_Confirm(t *testing.T) {
 	})
 }
 
+// --- Unsubscribe ---
 func TestSubscriptionUseCase_Unsubscribe(t *testing.T) {
+	t.Parallel()
+
 	t.Run("success", func(t *testing.T) {
-		repo, ghclient, notif := setupMocks()
-		usecase := newSubscriptionUseCase(repo, ghclient, notif)
+		t.Parallel()
 
 		for i, token := range validTokens {
 			t.Run(fmt.Sprintf("valid token %d", i+1), func(t *testing.T) {
+				t.Parallel()
+
+				repo, ghclient, notif := subscriptionUseCaseMocks()
+				usecase := newSubscriptionUseCase(repo, ghclient, notif)
+
 				repo.On("DeleteSubscription", token).Return(nil).Once()
 
 				err := usecase.Unsubscribe(token)
@@ -247,11 +230,15 @@ func TestSubscriptionUseCase_Unsubscribe(t *testing.T) {
 	})
 
 	t.Run("invalid token format", func(t *testing.T) {
-		repo, ghclient, notif := setupMocks()
-		usecase := newSubscriptionUseCase(repo, ghclient, notif)
+		t.Parallel()
 
 		for _, tt := range invalidTokens {
 			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+
+				repo, ghclient, notif := subscriptionUseCaseMocks()
+				usecase := newSubscriptionUseCase(repo, ghclient, notif)
+
 				err := usecase.Unsubscribe(tt.token)
 				assert.ErrorAs(t, err, new(*apperror.ErrInvalidResource))
 				mock.AssertExpectationsForObjects(t, repo, ghclient, notif)
@@ -260,7 +247,9 @@ func TestSubscriptionUseCase_Unsubscribe(t *testing.T) {
 	})
 
 	t.Run("token not found", func(t *testing.T) {
-		repo, ghclient, notif := setupMocks()
+		t.Parallel()
+
+		repo, ghclient, notif := subscriptionUseCaseMocks()
 		usecase := newSubscriptionUseCase(repo, ghclient, notif)
 
 		repo.On("DeleteSubscription", validTokens[0]).Return(apperror.ErrNotFound).Once()
@@ -271,9 +260,14 @@ func TestSubscriptionUseCase_Unsubscribe(t *testing.T) {
 	})
 }
 
+// --- GetSubscriptions ---
 func TestSubscriptionUseCase_GetSubscriptions(t *testing.T) {
+	t.Parallel()
+
 	t.Run("success", func(t *testing.T) {
-		repo, ghclient, notif := setupMocks()
+		t.Parallel()
+
+		repo, ghclient, notif := subscriptionUseCaseMocks()
 		usecase := newSubscriptionUseCase(repo, ghclient, notif)
 
 		input := "user@example.com"
@@ -293,11 +287,15 @@ func TestSubscriptionUseCase_GetSubscriptions(t *testing.T) {
 	})
 
 	t.Run("invalid email format", func(t *testing.T) {
-		repo, ghclient, notif := setupMocks()
-		usecase := newSubscriptionUseCase(repo, ghclient, notif)
+		t.Parallel()
 
 		for _, tt := range invalidEmails {
 			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+
+				repo, ghclient, notif := subscriptionUseCaseMocks()
+				usecase := newSubscriptionUseCase(repo, ghclient, notif)
+
 				_, err := usecase.GetSubscriptions(tt.email)
 				assert.ErrorAs(t, err, new(*apperror.ErrInvalidResource))
 				mock.AssertExpectationsForObjects(t, repo, ghclient, notif)

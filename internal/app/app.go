@@ -36,13 +36,13 @@ func Run() (err error) {
 		return
 	}
 
-	dbConn, err := db.ConnectDB(cfg.DSN())
+	gormdb, err := db.ConnectDB(cfg.DSN())
 	if err != nil {
 		logger.Err(err).Msg("error connecting to db")
 		return
 	}
 	defer func() {
-		sqlDB, err := dbConn.DB()
+		sqlDB, err := gormdb.DB()
 		if err != nil {
 			logger.Err(err).Msg("error getting sql.DB from gorm")
 			return
@@ -52,7 +52,7 @@ func Run() (err error) {
 		}
 	}()
 
-	err = db.RunMigrations(dbConn)
+	err = db.RunMigrations(gormdb, "migrations")
 	if err != nil {
 		logger.Err(err).Msg("error running migrations")
 		return
@@ -63,7 +63,7 @@ func Run() (err error) {
 
 	notifier := initNotifier(cfg)
 
-	repository := mariadb.NewSubscriptionRepo(dbConn)
+	repository := mariadb.NewSubscriptionRepo(gormdb)
 	subscriptionUseCase := usecase.NewSubscriptionUseCase(repository, githubClient, notifier)
 	subscriptionHandler := handler.NewSubcriptionHandler(subscriptionUseCase, logger)
 

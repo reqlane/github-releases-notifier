@@ -3,76 +3,31 @@ package handler
 import (
 	"bytes"
 	"encoding/json"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"testing"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/reqlane/github-releases-notifier/internal/apperror"
 	mockusecase "github.com/reqlane/github-releases-notifier/internal/mock/usecase"
 	"github.com/reqlane/github-releases-notifier/internal/model"
 	"github.com/reqlane/github-releases-notifier/internal/usecase"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 )
 
-// Helpers
-const (
-	ANY = mock.Anything
-)
-
-type usecaseMockBehaviour func(m *mockusecase.SubscriptionUseCase)
-
-func setupMocks() *mockusecase.SubscriptionUseCase {
-	return new(mockusecase.SubscriptionUseCase)
-}
-
-func newSubcriptionHandler(usecase *mockusecase.SubscriptionUseCase) *SubscriptionHandler {
-	return &SubscriptionHandler{
-		usecase: usecase,
-		logger:  zerolog.New(io.Discard),
-	}
-}
-
-func setupRouter(h *SubscriptionHandler) *gin.Engine {
-	gin.SetMode(gin.TestMode)
-	rt := gin.New()
-	api := rt.Group("/api")
-	api.POST("/subscribe", h.SubscribeHandler)
-	api.GET("/confirm/:token", h.ConfirmHandler)
-	api.GET("/unsubscribe/:token", h.UnsubscribeHandler)
-	api.GET("/subscriptions", h.GetSubscriptionsHandler)
-	return rt
-}
-
-func performRequest(t *testing.T, engine *gin.Engine, method, path string, body any) *httptest.ResponseRecorder {
-	var reqBody io.Reader
-	if body != nil {
-		b, err := json.Marshal(body)
-		if assert.NoError(t, err) {
-			reqBody = bytes.NewBuffer(b)
-		}
-	}
-	req := httptest.NewRequest(method, path, reqBody)
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
-	engine.ServeHTTP(w, req)
-	return w
-}
-
+// --- SubscribeHandler ---
 func TestSubscriptionHandler_SubscribeHandler(t *testing.T) {
+	t.Parallel()
+
 	testTable := []struct {
 		name                        string
 		email                       string
 		repo                        string
-		usecaseMockBehaviour        usecaseMockBehaviour
+		usecaseMockBehaviour        subscriptionUsecaseMockBehaviour
 		expectedStatusCode          int
 		expectedResponseDetailsKeys []string
-		expectedRetryAfter          string
+		expectRetryAfter            bool
 	}{
 		{
 			name:  "success",
@@ -145,10 +100,10 @@ func TestSubscriptionHandler_SubscribeHandler(t *testing.T) {
 			repo:  "owner/repo",
 			usecaseMockBehaviour: func(m *mockusecase.SubscriptionUseCase) {
 				m.On("Subscribe", &usecase.SubscribeInput{Email: "user@example.com", Repo: "owner/repo"}).
-					Return(&apperror.ErrGithubAPIRateLimited{ResetTime: time.Now().Add(30 * time.Second)}).Once()
+					Return(&apperror.ErrGithubAPIRateLimited{ResetTime: time.Now().Add(time.Minute)}).Once()
 			},
 			expectedStatusCode: http.StatusServiceUnavailable,
-			expectedRetryAfter: strconv.Itoa(int(time.Until(time.Now().Add(30 * time.Second)).Seconds())),
+			expectRetryAfter:   true,
 		},
 		{
 			name:  "internal server error",
@@ -164,7 +119,9 @@ func TestSubscriptionHandler_SubscribeHandler(t *testing.T) {
 
 	for _, tt := range testTable {
 		t.Run(tt.name, func(t *testing.T) {
-			uc := setupMocks()
+			t.Parallel()
+
+			uc := subscriptionHandlerMocks()
 			h := newSubcriptionHandler(uc)
 			rt := setupRouter(h)
 
@@ -186,15 +143,21 @@ func TestSubscriptionHandler_SubscribeHandler(t *testing.T) {
 					}
 				}
 			}
-			if tt.expectedRetryAfter != "" {
-				assert.Equal(t, tt.expectedRetryAfter, w.Header().Get("Retry-After"))
+			if tt.expectRetryAfter {
+				retryAfter := w.Header().Get("Retry-After")
+				if assert.NotEmpty(t, retryAfter) {
+					_, err := strconv.Atoi(retryAfter)
+					assert.NoError(t, err)
+				}
 			}
 			uc.AssertExpectations(t)
 		})
 	}
 
 	t.Run("invalid json body", func(t *testing.T) {
-		uc := setupMocks()
+		t.Parallel()
+
+		uc := subscriptionHandlerMocks()
 		h := newSubcriptionHandler(uc)
 		rt := setupRouter(h)
 
@@ -208,11 +171,14 @@ func TestSubscriptionHandler_SubscribeHandler(t *testing.T) {
 	})
 }
 
+// --- ConfirmHandler ---
 func TestSubscriptionHandler_ConfirmHandler(t *testing.T) {
+	t.Parallel()
+
 	testTable := []struct {
 		name                 string
 		confirmToken         string
-		usecaseMockBehaviour usecaseMockBehaviour
+		usecaseMockBehaviour subscriptionUsecaseMockBehaviour
 		expectedStatusCode   int
 	}{
 		{
@@ -255,7 +221,9 @@ func TestSubscriptionHandler_ConfirmHandler(t *testing.T) {
 
 	for _, tt := range testTable {
 		t.Run(tt.name, func(t *testing.T) {
-			uc := setupMocks()
+			t.Parallel()
+
+			uc := subscriptionHandlerMocks()
 			h := newSubcriptionHandler(uc)
 			rt := setupRouter(h)
 
@@ -269,11 +237,14 @@ func TestSubscriptionHandler_ConfirmHandler(t *testing.T) {
 	}
 }
 
+// --- UnsubscribeHandler ---
 func TestSubscriptionHandler_UnsubscribeHandler(t *testing.T) {
+	t.Parallel()
+
 	testTable := []struct {
 		name                 string
 		unsubscribeToken     string
-		usecaseMockBehaviour usecaseMockBehaviour
+		usecaseMockBehaviour subscriptionUsecaseMockBehaviour
 		expectedStatusCode   int
 	}{
 		{
@@ -316,7 +287,9 @@ func TestSubscriptionHandler_UnsubscribeHandler(t *testing.T) {
 
 	for _, tt := range testTable {
 		t.Run(tt.name, func(t *testing.T) {
-			uc := setupMocks()
+			t.Parallel()
+
+			uc := subscriptionHandlerMocks()
 			h := newSubcriptionHandler(uc)
 			rt := setupRouter(h)
 
@@ -330,11 +303,14 @@ func TestSubscriptionHandler_UnsubscribeHandler(t *testing.T) {
 	}
 }
 
+// --- GetSubscriptionsHandler ---
 func TestSubscriptionHandler_GetSubscriptionsHandler(t *testing.T) {
+	t.Parallel()
+
 	testTable := []struct {
 		name                  string
 		email                 string
-		usecaseMockBehaviour  usecaseMockBehaviour
+		usecaseMockBehaviour  subscriptionUsecaseMockBehaviour
 		expectedStatusCode    int
 		expectedSubscriptions []model.Subscription
 	}{
@@ -388,7 +364,9 @@ func TestSubscriptionHandler_GetSubscriptionsHandler(t *testing.T) {
 
 	for _, tt := range testTable {
 		t.Run(tt.name, func(t *testing.T) {
-			uc := setupMocks()
+			t.Parallel()
+
+			uc := subscriptionHandlerMocks()
 			h := newSubcriptionHandler(uc)
 			rt := setupRouter(h)
 

@@ -1,6 +1,9 @@
 package db
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/golang-migrate/migrate/v4"
 	mysqlmigrate "github.com/golang-migrate/migrate/v4/database/mysql"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -26,7 +29,7 @@ func ConnectDB(dsn string) (*gorm.DB, error) {
 	return db, nil
 }
 
-func RunMigrations(db *gorm.DB) error {
+func RunMigrations(db *gorm.DB, migrationsPath string) error {
 	sqlDB, err := db.DB()
 	if err != nil {
 		return err
@@ -37,12 +40,12 @@ func RunMigrations(db *gorm.DB) error {
 		return err
 	}
 
-	m, err := migrate.NewWithDatabaseInstance("file://migrations", "mysql", driver)
+	m, err := migrate.NewWithDatabaseInstance(fmt.Sprintf("file://%s", migrationsPath), "mysql", driver)
 	if err != nil {
 		return err
 	}
 
-	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return err
 	}
 	return nil
