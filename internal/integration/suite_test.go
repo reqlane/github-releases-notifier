@@ -83,6 +83,8 @@ func (s *IntegrationTestSuite) runMigrations(migrationsPath string) {
 }
 
 func (s *IntegrationTestSuite) initDependencies() {
+	s.ghclient = new(mockgithubapi.GithubClient)
+	s.notif = new(mocknotifier.Notifier)
 	repo := mariadb.NewSubscriptionRepo(s.db)
 	uc := usecase.NewSubscriptionUseCase(repo, s.ghclient, s.notif)
 	h := handler.NewSubcriptionHandler(uc, zerolog.New(io.Discard))
@@ -98,4 +100,8 @@ func setupRouter(h *handler.SubscriptionHandler) *gin.Engine {
 	api.GET("/unsubscribe/:token", h.UnsubscribeHandler)
 	api.GET("/subscriptions", h.GetSubscriptionsHandler)
 	return rt
+}
+
+func (s *IntegrationTestSuite) TestTemplate() {
+	fmt.Println("Just for testing CI")
 }
