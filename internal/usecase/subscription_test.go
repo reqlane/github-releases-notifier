@@ -33,11 +33,11 @@ func TestSubscriptionUseCase_Subscribe(t *testing.T) {
 		// github api calls
 		ghclient.
 			On("RepoExists", input.Repo).Return(nil).Once().
-			On("GetLatestRelease", input.Repo).Return(&lastSeenTag, nil).Once()
+			On("GetLatestRelease", input.Repo).Return(lastSeenTag, nil).Once()
 
 		// database creation
 		repo.
-			On("GetOrCreateRepo", input.Repo, &lastSeenTag).Return(model.Repo{ID: repoID}, nil).Once().
+			On("GetOrCreateRepo", input.Repo, lastSeenTag).Return(model.Repo{ID: repoID}, nil).Once().
 			On("CreateSubscription", input.Email, repoID, ANY, ANY).Return(nil).Once()
 
 		// confirmation email
@@ -134,7 +134,7 @@ func TestSubscriptionUseCase_Subscribe(t *testing.T) {
 			Email: "user@example.com",
 			Repo:  "owner/repo",
 		}
-		var noReleases *string
+		noReleases := ""
 		createdRepo := model.Repo{ID: 100, Repo: input.Repo, LastSeenTag: ""}
 
 		repo.On("SubscriptionExists", input.Email, input.Repo).Return(false, nil).Once()

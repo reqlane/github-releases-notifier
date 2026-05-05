@@ -90,11 +90,11 @@ func (r *mariadbSubscriptionRepo) DeleteSubscription(unsubscribeToken string) er
 	return nil
 }
 
-func (r *mariadbSubscriptionRepo) GetOrCreateRepo(repoName string, lastSeenTag *string) (model.Repo, error) {
+func (r *mariadbSubscriptionRepo) GetOrCreateRepo(repoName string, lastSeenTag string) (model.Repo, error) {
 	var repo entity.Repo
 	result := r.db.
 		Where(entity.Repo{Repo: repoName}).
-		Attrs(entity.Repo{LastSeenTag: lastSeenTag}).
+		Attrs(entity.Repo{LastSeenTag: &lastSeenTag}).
 		FirstOrCreate(&repo)
 	if result.Error != nil {
 		return model.Repo{}, result.Error
@@ -139,9 +139,9 @@ func (r *mariadbSubscriptionRepo) GetNotificationTargetsByRepo(repoID uint) ([]m
 	return targets, nil
 }
 
-func (r *mariadbSubscriptionRepo) UpdateLastSeenTag(repoID uint, tag *string) error {
+func (r *mariadbSubscriptionRepo) UpdateLastSeenTag(repoID uint, tag string) error {
 	return r.db.
 		Model(&entity.Repo{ID: repoID}).
-		Update("last_seen_tag", tag).
+		Update("last_seen_tag", &tag).
 		Error
 }

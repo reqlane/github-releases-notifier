@@ -11,10 +11,7 @@ func (m *GithubClient) RepoExists(repo string) error {
 	return args.Error(0)
 }
 
-func (m *GithubClient) GetLatestRelease(repo string) (*string, error) {
+func (m *GithubClient) GetLatestRelease(repo string) (string, error) {
 	args := m.Called(repo)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*string), args.Error(1)
+	return args.String(0), args.Error(1)
 }

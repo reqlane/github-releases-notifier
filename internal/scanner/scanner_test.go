@@ -65,9 +65,9 @@ func TestScanner_CheckRepo(t *testing.T) {
 		newRelease := "v2.0.0"
 
 		for _, input := range inputs {
-			ghclient.On("GetLatestRelease", input.Repo).Return(&newRelease, nil).Once()
+			ghclient.On("GetLatestRelease", input.Repo).Return(newRelease, nil).Once()
 			repo.
-				On("UpdateLastSeenTag", input.ID, &newRelease).Return(nil).Once().
+				On("UpdateLastSeenTag", input.ID, newRelease).Return(nil).Once().
 				On("GetNotificationTargetsByRepo", input.ID).Return(targets, nil).Once()
 			for _, target := range targets {
 				notif.On("SendNotification", target.Email, input.Repo, newRelease, target.UnsubscribeToken).Return(nil).Once()
@@ -86,7 +86,7 @@ func TestScanner_CheckRepo(t *testing.T) {
 
 		input := model.Repo{Repo: "owner/repo", LastSeenTag: "v1.0.0"}
 
-		ghclient.On("GetLatestRelease", input.Repo).Return(&input.LastSeenTag, nil).Once()
+		ghclient.On("GetLatestRelease", input.Repo).Return(input.LastSeenTag, nil).Once()
 
 		s.checkRepo(input)
 
@@ -103,7 +103,7 @@ func TestScanner_CheckRepo(t *testing.T) {
 
 		input := model.Repo{Repo: "owner/repo", LastSeenTag: "v1.0.0"}
 
-		ghclient.On("GetLatestRelease", input.Repo).Return(nil, nil).Once()
+		ghclient.On("GetLatestRelease", input.Repo).Return("", nil).Once()
 
 		s.checkRepo(input)
 
@@ -121,8 +121,8 @@ func TestScanner_CheckRepo(t *testing.T) {
 		input := model.Repo{Repo: "owner/repo", LastSeenTag: "v1.0.0"}
 		newRelease := "v2.0.0"
 
-		ghclient.On("GetLatestRelease", input.Repo).Return(&newRelease, nil).Once()
-		repo.On("UpdateLastSeenTag", input.ID, &newRelease).Return(assert.AnError).Once()
+		ghclient.On("GetLatestRelease", input.Repo).Return(newRelease, nil).Once()
+		repo.On("UpdateLastSeenTag", input.ID, newRelease).Return(assert.AnError).Once()
 
 		s.checkRepo(input)
 
@@ -139,9 +139,9 @@ func TestScanner_CheckRepo(t *testing.T) {
 		input := model.Repo{Repo: "owner/repo", LastSeenTag: "v1.0.0"}
 		newRelease := "v2.0.0"
 
-		ghclient.On("GetLatestRelease", input.Repo).Return(&newRelease, nil).Once()
+		ghclient.On("GetLatestRelease", input.Repo).Return(newRelease, nil).Once()
 		repo.
-			On("UpdateLastSeenTag", input.ID, &newRelease).Return(nil).Once().
+			On("UpdateLastSeenTag", input.ID, newRelease).Return(nil).Once().
 			On("GetNotificationTargetsByRepo", input.ID).Return(nil, assert.AnError).Once()
 
 		s.checkRepo(input)
@@ -164,9 +164,9 @@ func TestScanner_CheckRepo(t *testing.T) {
 		}
 		newRelease := "v2.0.0"
 
-		ghclient.On("GetLatestRelease", input.Repo).Return(&newRelease, nil).Once()
+		ghclient.On("GetLatestRelease", input.Repo).Return(newRelease, nil).Once()
 		repo.
-			On("UpdateLastSeenTag", input.ID, &newRelease).Return(nil).Once().
+			On("UpdateLastSeenTag", input.ID, newRelease).Return(nil).Once().
 			On("GetNotificationTargetsByRepo", input.ID).Return(targets, nil).Once()
 		notif.
 			On("SendNotification", targets[0].Email, input.Repo, newRelease, ANY).Return(assert.AnError).Once().
@@ -191,7 +191,7 @@ func TestScanner_RateLimited(t *testing.T) {
 		input := model.Repo{Repo: "owner/repo"}
 		resetTime := time.Now().Add(5 * time.Minute)
 
-		ghclient.On("GetLatestRelease", input.Repo).Return(nil, &apperror.ErrGithubAPIRateLimited{ResetTime: resetTime}).Once()
+		ghclient.On("GetLatestRelease", input.Repo).Return("", &apperror.ErrGithubAPIRateLimited{ResetTime: resetTime}).Once()
 
 		s.checkRepo(input)
 

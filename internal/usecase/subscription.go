@@ -1,19 +1,20 @@
 package usecase
 
 import (
-	"crypto/rand"
 	"encoding/hex"
 	"errors"
 
 	"github.com/reqlane/github-releases-notifier/internal/apperror"
 	"github.com/reqlane/github-releases-notifier/internal/contract"
 	"github.com/reqlane/github-releases-notifier/internal/model"
+	"github.com/reqlane/github-releases-notifier/pkg/tokengen"
 )
 
 type subscriptionUseCase struct {
 	repo         contract.SubscriptionRepo
 	githubClient contract.GithubClient
 	notif        contract.Notifier
+	tokenGen     tokengen.Generator
 }
 
 func NewSubscriptionUseCase(r contract.SubscriptionRepo, g contract.GithubClient, n contract.Notifier) SubscriptionUseCase {
@@ -21,6 +22,7 @@ func NewSubscriptionUseCase(r contract.SubscriptionRepo, g contract.GithubClient
 		repo:         r,
 		githubClient: g,
 		notif:        n,
+		tokenGen:     tokengen.NewRandGenerator(32),
 	}
 }
 
@@ -57,9 +59,9 @@ func (s *subscriptionUseCase) Subscribe(input *SubscribeInput) error {
 	}
 
 	// Create subscription
-	tokens, err := generateSubscriptionTokens()
-	if err != nil {
-		return err
+	tokens := model.SubscriptionTokens{
+		ConfirmToken:     s.tokenGen.Generate(),
+		UnsubscribeToken: s.tokenGen.Generate(),
 	}
 	err = s.repo.CreateSubscription(input.Email, trackedRepo.ID, tokens)
 	if err != nil {
@@ -118,31 +120,6 @@ func (s *subscriptionUseCase) GetSubscriptions(email string) ([]model.Subscripti
 	}
 
 	return subscriptions, nil
-}
-
-func generateSubscriptionTokens() (model.SubscriptionTokens, error) {
-	confirmToken, err := generateToken()
-	if err != nil {
-		return model.SubscriptionTokens{}, err
-	}
-	unsubscribeToken, err := generateToken()
-	if err != nil {
-		return model.SubscriptionTokens{}, err
-	}
-	tokens := model.SubscriptionTokens{
-		ConfirmToken:     confirmToken,
-		UnsubscribeToken: unsubscribeToken,
-	}
-	return tokens, nil
-}
-
-func generateToken() (string, error) {
-	b := make([]byte, 32)
-	_, err := rand.Read(b)
-	if err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(b), nil
 }
 
 func isValidToken(token string) bool {

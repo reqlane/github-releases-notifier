@@ -10,11 +10,11 @@ import (
 	"github.com/gin-gonic/gin"
 	mockusecase "github.com/reqlane/github-releases-notifier/internal/mock/usecase"
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // --- SubscriptionHandler ---
-type subscriptionUsecaseMockBehaviour func(m *mockusecase.SubscriptionUseCase)
+type handlerMocksBehaviour func(m *mockusecase.SubscriptionUseCase)
 
 func subscriptionHandlerMocks() *mockusecase.SubscriptionUseCase {
 	return new(mockusecase.SubscriptionUseCase)
@@ -43,9 +43,8 @@ func performRequest(t *testing.T, engine *gin.Engine, method, path string, body 
 	var reqBody io.Reader
 	if body != nil {
 		b, err := json.Marshal(body)
-		if assert.NoError(t, err) {
-			reqBody = bytes.NewBuffer(b)
-		}
+		require.NoError(t, err)
+		reqBody = bytes.NewBuffer(b)
 	}
 	req := httptest.NewRequest(method, path, reqBody)
 	req.Header.Set("Content-Type", "application/json")

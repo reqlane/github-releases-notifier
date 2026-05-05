@@ -28,11 +28,7 @@ func init() {
 	}
 
 	validate.RegisterTagNameFunc(func(field reflect.StructField) string {
-		jsonTag := field.Tag.Get("json")
-		if jsonTag == "" || jsonTag == "-" {
-			return field.Name
-		}
-		return strings.Split(jsonTag, ",")[0]
+		return field.Tag.Get("label")
 	})
 }
 

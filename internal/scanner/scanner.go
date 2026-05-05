@@ -108,7 +108,7 @@ func (s *FixedRateScanner) checkRepo(repo model.Repo) {
 		return
 	}
 
-	if tag == nil || *tag == repo.LastSeenTag {
+	if tag == "" || tag == repo.LastSeenTag {
 		s.logger.Info().Str("repo", repo.Repo).Msg("no new releases for repo")
 		return
 	}
@@ -126,7 +126,7 @@ func (s *FixedRateScanner) checkRepo(repo model.Repo) {
 	}
 
 	for _, target := range targets {
-		err = s.notif.SendNotification(target.Email, repo.Repo, *tag, target.UnsubscribeToken)
+		err = s.notif.SendNotification(target.Email, repo.Repo, tag, target.UnsubscribeToken)
 		if err != nil {
 			s.logger.Err(err).Str("email", target.Email).Msg("error sending notification to email")
 		}

@@ -1,10 +1,13 @@
 package integration
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -17,6 +20,7 @@ import (
 	mocknotifier "github.com/reqlane/github-releases-notifier/internal/mock/notifier"
 	"github.com/reqlane/github-releases-notifier/internal/repository/mariadb"
 	"github.com/reqlane/github-releases-notifier/internal/usecase"
+	"github.com/reqlane/github-releases-notifier/pkg/tokengen"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/suite"
 	tcmariadb "github.com/testcontainers/testcontainers-go/modules/mariadb"
@@ -32,6 +36,7 @@ type IntegrationTestSuite struct {
 	router    *gin.Engine
 	ghclient  *mockgithubapi.GithubClient
 	notif     *mocknotifier.Notifier
+	tokenGen  tokengen.Generator
 }
 
 func TestIntegrationSuite(t *testing.T) {
@@ -68,6 +73,22 @@ func (s *IntegrationTestSuite) TearDownSuite() {
 	s.Require().NoError(s.container.Terminate(s.ctx))
 }
 
+func (s *IntegrationTestSuite) SetupTest() {
+	cleanupQueries := []string{
+		"SET FOREIGN_KEY_CHECKS = 0",
+		"TRUNCATE TABLE subscriptions",
+		"TRUNCATE TABLE repos",
+		"SET FOREIGN_KEY_CHECKS = 1",
+	}
+	for _, query := range cleanupQueries {
+		s.Require().NoError(s.db.Exec(query).Error)
+	}
+	s.ghclient.ExpectedCalls = nil
+	s.ghclient.Calls = nil
+	s.notif.ExpectedCalls = nil
+	s.notif.Calls = nil
+}
+
 func (s *IntegrationTestSuite) runMigrations(migrationsPath string) {
 	sqlDB, err := s.db.DB()
 	s.Require().NoError(err)
@@ -85,10 +106,49 @@ func (s *IntegrationTestSuite) runMigrations(migrationsPath string) {
 func (s *IntegrationTestSuite) initDependencies() {
 	s.ghclient = new(mockgithubapi.GithubClient)
 	s.notif = new(mocknotifier.Notifier)
+	s.tokenGen = tokengen.NewRandGenerator(32)
 	repo := mariadb.NewSubscriptionRepo(s.db)
 	uc := usecase.NewSubscriptionUseCase(repo, s.ghclient, s.notif)
 	h := handler.NewSubcriptionHandler(uc, zerolog.New(io.Discard))
 	s.router = setupRouter(h)
+}
+
+func (s *IntegrationTestSuite) performRequest(method, path string, body any) *httptest.ResponseRecorder {
+	var reqBody io.Reader
+	if body != nil {
+		b, err := json.Marshal(body)
+		s.Require().NoError(err)
+		reqBody = bytes.NewBuffer(b)
+	}
+	req := httptest.NewRequest(method, path, reqBody)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	s.router.ServeHTTP(w, req)
+	return w
+}
+
+func (s *IntegrationTestSuite) seedSubscription(email, repo string, confirmed bool) (string, string) {
+	s.Require().NoError(s.db.Exec(
+		`INSERT INTO repos (repo, last_seen_tag) VALUES (?, ?) ON DUPLICATE KEY UPDATE id=id`,
+		repo, "v1.0.0",
+	).Error)
+
+	var repoID uint
+	s.Require().NoError(s.db.Raw(`SELECT id FROM repos WHERE repo=?`, repo).Scan(&repoID).Error)
+
+	confirmToken := s.tokenGen.Generate()
+	unsubscribeToken := s.tokenGen.Generate()
+	var ct *string
+	if !confirmed {
+		ct = &confirmToken
+	}
+	s.Require().NoError(s.db.Exec(
+		`INSERT INTO subscriptions (email, repo_id, confirmed, confirm_token, unsubscribe_token)
+         VALUES (?, ?, ?, ?, ?)`,
+		email, repoID, confirmed, ct, unsubscribeToken,
+	).Error)
+
+	return confirmToken, unsubscribeToken
 }
 
 func setupRouter(h *handler.SubscriptionHandler) *gin.Engine {
@@ -100,8 +160,4 @@ func setupRouter(h *handler.SubscriptionHandler) *gin.Engine {
 	api.GET("/unsubscribe/:token", h.UnsubscribeHandler)
 	api.GET("/subscriptions", h.GetSubscriptionsHandler)
 	return rt
-}
-
-func (s *IntegrationTestSuite) TestTemplate() {
-	fmt.Println("Just for testing CI")
 }

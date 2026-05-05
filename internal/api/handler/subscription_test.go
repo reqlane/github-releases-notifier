@@ -14,6 +14,7 @@ import (
 	"github.com/reqlane/github-releases-notifier/internal/model"
 	"github.com/reqlane/github-releases-notifier/internal/usecase"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // --- SubscribeHandler ---
@@ -24,7 +25,7 @@ func TestSubscriptionHandler_SubscribeHandler(t *testing.T) {
 		name                        string
 		email                       string
 		repo                        string
-		usecaseMockBehaviour        subscriptionUsecaseMockBehaviour
+		mocksBehaviour              handlerMocksBehaviour
 		expectedStatusCode          int
 		expectedResponseDetailsKeys []string
 		expectRetryAfter            bool
@@ -33,7 +34,7 @@ func TestSubscriptionHandler_SubscribeHandler(t *testing.T) {
 			name:  "success",
 			email: "user@example.com",
 			repo:  "owner/repo",
-			usecaseMockBehaviour: func(m *mockusecase.SubscriptionUseCase) {
+			mocksBehaviour: func(m *mockusecase.SubscriptionUseCase) {
 				m.On("Subscribe", &usecase.SubscribeInput{Email: "user@example.com", Repo: "owner/repo"}).Return(nil).Once()
 			},
 			expectedStatusCode: http.StatusOK,
@@ -42,7 +43,7 @@ func TestSubscriptionHandler_SubscribeHandler(t *testing.T) {
 			name:  "subscription already exists",
 			email: "user@example.com",
 			repo:  "owner/repo",
-			usecaseMockBehaviour: func(m *mockusecase.SubscriptionUseCase) {
+			mocksBehaviour: func(m *mockusecase.SubscriptionUseCase) {
 				m.On("Subscribe", &usecase.SubscribeInput{Email: "user@example.com", Repo: "owner/repo"}).
 					Return(apperror.ErrSubscriptionAlreadyExists).Once()
 			},
@@ -52,7 +53,7 @@ func TestSubscriptionHandler_SubscribeHandler(t *testing.T) {
 			name:  "invalid email format",
 			email: "not_an_email",
 			repo:  "owner/repo",
-			usecaseMockBehaviour: func(m *mockusecase.SubscriptionUseCase) {
+			mocksBehaviour: func(m *mockusecase.SubscriptionUseCase) {
 				m.On("Subscribe", &usecase.SubscribeInput{Email: "not_an_email", Repo: "owner/repo"}).
 					Return(&apperror.ErrValidation{
 						Errs: []apperror.ErrField{
@@ -67,7 +68,7 @@ func TestSubscriptionHandler_SubscribeHandler(t *testing.T) {
 			name:  "invalid repo format",
 			email: "user@example.com",
 			repo:  "not_a_repo",
-			usecaseMockBehaviour: func(m *mockusecase.SubscriptionUseCase) {
+			mocksBehaviour: func(m *mockusecase.SubscriptionUseCase) {
 				m.On("Subscribe", &usecase.SubscribeInput{Email: "user@example.com", Repo: "not_a_repo"}).
 					Return(&apperror.ErrValidation{
 						Errs: []apperror.ErrField{
@@ -82,7 +83,7 @@ func TestSubscriptionHandler_SubscribeHandler(t *testing.T) {
 			name:  "invalid email and repo formats",
 			email: "not_an_email",
 			repo:  "not_a_repo",
-			usecaseMockBehaviour: func(m *mockusecase.SubscriptionUseCase) {
+			mocksBehaviour: func(m *mockusecase.SubscriptionUseCase) {
 				m.On("Subscribe", &usecase.SubscribeInput{Email: "not_an_email", Repo: "not_a_repo"}).
 					Return(&apperror.ErrValidation{
 						Errs: []apperror.ErrField{
@@ -95,10 +96,20 @@ func TestSubscriptionHandler_SubscribeHandler(t *testing.T) {
 			expectedResponseDetailsKeys: []string{"email", "repo"},
 		},
 		{
+			name:  "repo not found",
+			email: "user@example.com",
+			repo:  "owner/repo",
+			mocksBehaviour: func(m *mockusecase.SubscriptionUseCase) {
+				m.On("Subscribe", &usecase.SubscribeInput{Email: "user@example.com", Repo: "owner/repo"}).
+					Return(&apperror.ErrResourceNotFound{}).Once()
+			},
+			expectedStatusCode: http.StatusNotFound,
+		},
+		{
 			name:  "rate limited",
 			email: "user@example.com",
 			repo:  "owner/repo",
-			usecaseMockBehaviour: func(m *mockusecase.SubscriptionUseCase) {
+			mocksBehaviour: func(m *mockusecase.SubscriptionUseCase) {
 				m.On("Subscribe", &usecase.SubscribeInput{Email: "user@example.com", Repo: "owner/repo"}).
 					Return(&apperror.ErrGithubAPIRateLimited{ResetTime: time.Now().Add(time.Minute)}).Once()
 			},
@@ -109,7 +120,7 @@ func TestSubscriptionHandler_SubscribeHandler(t *testing.T) {
 			name:  "internal server error",
 			email: "user@example.com",
 			repo:  "owner/repo",
-			usecaseMockBehaviour: func(m *mockusecase.SubscriptionUseCase) {
+			mocksBehaviour: func(m *mockusecase.SubscriptionUseCase) {
 				m.On("Subscribe", &usecase.SubscribeInput{Email: "user@example.com", Repo: "owner/repo"}).
 					Return(assert.AnError).Once()
 			},
@@ -130,25 +141,23 @@ func TestSubscriptionHandler_SubscribeHandler(t *testing.T) {
 				"repo":  tt.repo,
 			}
 
-			tt.usecaseMockBehaviour(uc)
+			tt.mocksBehaviour(uc)
 
 			w := performRequest(t, rt, http.MethodPost, "/api/subscribe", body)
 
-			assert.Equal(t, tt.expectedStatusCode, w.Code)
+			require.Equal(t, tt.expectedStatusCode, w.Code)
 			if tt.expectedResponseDetailsKeys != nil {
 				var resp APIResponse
-				if assert.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp)) {
-					for _, key := range tt.expectedResponseDetailsKeys {
-						assert.Contains(t, resp.Details, key)
-					}
+				require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+				for _, key := range tt.expectedResponseDetailsKeys {
+					assert.Contains(t, resp.Details, key)
 				}
 			}
 			if tt.expectRetryAfter {
 				retryAfter := w.Header().Get("Retry-After")
-				if assert.NotEmpty(t, retryAfter) {
-					_, err := strconv.Atoi(retryAfter)
-					assert.NoError(t, err)
-				}
+				assert.NotEmpty(t, retryAfter)
+				_, err := strconv.Atoi(retryAfter)
+				assert.NoError(t, err)
 			}
 			uc.AssertExpectations(t)
 		})
@@ -178,7 +187,7 @@ func TestSubscriptionHandler_ConfirmHandler(t *testing.T) {
 	testTable := []struct {
 		name                 string
 		confirmToken         string
-		usecaseMockBehaviour subscriptionUsecaseMockBehaviour
+		usecaseMockBehaviour handlerMocksBehaviour
 		expectedStatusCode   int
 	}{
 		{
@@ -244,7 +253,7 @@ func TestSubscriptionHandler_UnsubscribeHandler(t *testing.T) {
 	testTable := []struct {
 		name                 string
 		unsubscribeToken     string
-		usecaseMockBehaviour subscriptionUsecaseMockBehaviour
+		usecaseMockBehaviour handlerMocksBehaviour
 		expectedStatusCode   int
 	}{
 		{
@@ -310,7 +319,7 @@ func TestSubscriptionHandler_GetSubscriptionsHandler(t *testing.T) {
 	testTable := []struct {
 		name                  string
 		email                 string
-		usecaseMockBehaviour  subscriptionUsecaseMockBehaviour
+		usecaseMockBehaviour  handlerMocksBehaviour
 		expectedStatusCode    int
 		expectedSubscriptions []model.Subscription
 	}{
@@ -374,12 +383,11 @@ func TestSubscriptionHandler_GetSubscriptionsHandler(t *testing.T) {
 
 			w := performRequest(t, rt, http.MethodGet, "/api/subscriptions?email="+tt.email, nil)
 
-			assert.Equal(t, tt.expectedStatusCode, w.Code)
+			require.Equal(t, tt.expectedStatusCode, w.Code)
 			if tt.expectedSubscriptions != nil {
 				var subscriptions []model.Subscription
-				if assert.NoError(t, json.Unmarshal(w.Body.Bytes(), &subscriptions)) {
-					assert.Equal(t, tt.expectedSubscriptions, subscriptions)
-				}
+				require.NoError(t, json.Unmarshal(w.Body.Bytes(), &subscriptions))
+				assert.Equal(t, tt.expectedSubscriptions, subscriptions)
 			}
 			uc.AssertExpectations(t)
 		})
