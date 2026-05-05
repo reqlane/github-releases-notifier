@@ -24,7 +24,7 @@ func TestScanner_Scan(t *testing.T) {
 
 		s.scan()
 
-		ghclient.AssertNotCalled(t, "GetLatestRelease", ANY)
+		ghclient.AssertNotCalled(t, "GetLatestRelease")
 		mock.AssertExpectationsForObjects(t, repo, ghclient, notif)
 	})
 
@@ -38,7 +38,7 @@ func TestScanner_Scan(t *testing.T) {
 
 		s.scan()
 
-		ghclient.AssertNotCalled(t, "GetLatestRelease", ANY)
+		ghclient.AssertNotCalled(t, "GetLatestRelease")
 		mock.AssertExpectationsForObjects(t, repo, ghclient, notif)
 	})
 }
@@ -90,8 +90,8 @@ func TestScanner_CheckRepo(t *testing.T) {
 
 		s.checkRepo(input)
 
-		repo.AssertNotCalled(t, "UpdateLastSeenTag", ANY, ANY)
-		notif.AssertNotCalled(t, "SendNotification", ANY, ANY, ANY, ANY)
+		repo.AssertNotCalled(t, "UpdateLastSeenTag")
+		notif.AssertNotCalled(t, "SendNotification")
 		mock.AssertExpectationsForObjects(t, repo, ghclient, notif)
 	})
 
@@ -107,8 +107,8 @@ func TestScanner_CheckRepo(t *testing.T) {
 
 		s.checkRepo(input)
 
-		repo.AssertNotCalled(t, "UpdateLastSeenTag", ANY, ANY)
-		notif.AssertNotCalled(t, "SendNotification", ANY, ANY, ANY, ANY)
+		repo.AssertNotCalled(t, "UpdateLastSeenTag")
+		notif.AssertNotCalled(t, "SendNotification")
 		mock.AssertExpectationsForObjects(t, repo, ghclient, notif)
 	})
 
@@ -126,7 +126,7 @@ func TestScanner_CheckRepo(t *testing.T) {
 
 		s.checkRepo(input)
 
-		notif.AssertNotCalled(t, "SendNotification", ANY, ANY, ANY, ANY)
+		notif.AssertNotCalled(t, "SendNotification")
 		mock.AssertExpectationsForObjects(t, repo, ghclient, notif)
 	})
 
@@ -146,7 +146,7 @@ func TestScanner_CheckRepo(t *testing.T) {
 
 		s.checkRepo(input)
 
-		notif.AssertNotCalled(t, "SendNotification", ANY, ANY, ANY, ANY)
+		notif.AssertNotCalled(t, "SendNotification")
 		mock.AssertExpectationsForObjects(t, repo, ghclient, notif)
 	})
 
@@ -169,8 +169,8 @@ func TestScanner_CheckRepo(t *testing.T) {
 			On("UpdateLastSeenTag", input.ID, newRelease).Return(nil).Once().
 			On("GetNotificationTargetsByRepo", input.ID).Return(targets, nil).Once()
 		notif.
-			On("SendNotification", targets[0].Email, input.Repo, newRelease, ANY).Return(assert.AnError).Once().
-			On("SendNotification", ANY, input.Repo, newRelease, ANY).Return(nil).Twice()
+			On("SendNotification", targets[0].Email, input.Repo, newRelease, mock.AnythingOfType("string")).Return(assert.AnError).Once().
+			On("SendNotification", mock.AnythingOfType("string"), input.Repo, newRelease, mock.AnythingOfType("string")).Return(nil).Twice()
 
 		s.checkRepo(input)
 

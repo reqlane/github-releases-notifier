@@ -6,11 +6,6 @@ import (
 	mockgithubapi "github.com/reqlane/github-releases-notifier/internal/mock/githubapi"
 	mocknotifier "github.com/reqlane/github-releases-notifier/internal/mock/notifier"
 	mockrepository "github.com/reqlane/github-releases-notifier/internal/mock/repository"
-	"github.com/stretchr/testify/mock"
-)
-
-const (
-	ANY = mock.Anything
 )
 
 var (

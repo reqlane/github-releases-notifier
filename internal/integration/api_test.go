@@ -14,10 +14,6 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-const (
-	ANY = mock.Anything
-)
-
 // --- POST /api/subscribe ---
 func (s *IntegrationTestSuite) TestAPI_Subscribe_Success() {
 	body := dto.SubscribeRequest{
@@ -28,7 +24,7 @@ func (s *IntegrationTestSuite) TestAPI_Subscribe_Success() {
 
 	s.ghclient.On("RepoExists", body.Repo).Return(nil).Once()
 	s.ghclient.On("GetLatestRelease", body.Repo).Return(latestRelease, nil)
-	s.notif.On("SendConfirmation", body.Email, body.Repo, ANY).Return(nil).Once()
+	s.notif.On("SendConfirmation", body.Email, body.Repo, mock.AnythingOfType("model.SubscriptionTokens")).Return(nil).Once()
 
 	w := s.performRequest(http.MethodPost, "/api/subscribe", body)
 

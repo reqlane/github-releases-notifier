@@ -38,10 +38,10 @@ func TestSubscriptionUseCase_Subscribe(t *testing.T) {
 		// database creation
 		repo.
 			On("GetOrCreateRepo", input.Repo, lastSeenTag).Return(model.Repo{ID: repoID}, nil).Once().
-			On("CreateSubscription", input.Email, repoID, ANY, ANY).Return(nil).Once()
+			On("CreateSubscription", input.Email, repoID, mock.AnythingOfType("model.SubscriptionTokens")).Return(nil).Once()
 
 		// confirmation email
-		notif.On("SendConfirmation", input.Email, input.Repo, ANY, ANY).Return(nil).Once()
+		notif.On("SendConfirmation", input.Email, input.Repo, mock.AnythingOfType("model.SubscriptionTokens")).Return(nil).Once()
 
 		err := usecase.Subscribe(input)
 
@@ -143,8 +143,8 @@ func TestSubscriptionUseCase_Subscribe(t *testing.T) {
 			On("GetLatestRelease", input.Repo).Return(noReleases, nil).Once()
 		repo.
 			On("GetOrCreateRepo", input.Repo, noReleases).Return(createdRepo, nil).
-			On("CreateSubscription", input.Email, createdRepo.ID, ANY).Return(nil).Once()
-		notif.On("SendConfirmation", input.Email, input.Repo, ANY).Return(nil).Once()
+			On("CreateSubscription", input.Email, createdRepo.ID, mock.AnythingOfType("model.SubscriptionTokens")).Return(nil).Once()
+		notif.On("SendConfirmation", input.Email, input.Repo, mock.AnythingOfType("model.SubscriptionTokens")).Return(nil).Once()
 
 		err := usecase.Subscribe(input)
 		assert.NoError(t, err)

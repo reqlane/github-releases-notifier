@@ -8,11 +8,6 @@ import (
 	mocknotifier "github.com/reqlane/github-releases-notifier/internal/mock/notifier"
 	mockrepository "github.com/reqlane/github-releases-notifier/internal/mock/repository"
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/mock"
-)
-
-const (
-	ANY = mock.Anything
 )
 
 // --- Scanner ---
