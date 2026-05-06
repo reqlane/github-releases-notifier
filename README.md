@@ -13,18 +13,21 @@ Two things work concurrently:
 - **HTTP server** handles subscription management: subscribe, confirm, unsubscribe, get by email.
 - **FixedRateScanner** runs in a goroutine, polling Github for new releases at a steady, controlled rate depending on github API token presence.
 
-## Architecture of the project
+## Architecture of the application
 
-**Written following clean architecture principles:**
+### Written following clean architecture principles:
 
 - Easy to expand
 - More convenient to test
 - Easy to change external dependencies
 - etc.
 
-### Response format
+### Diagram:
+![Architecture](docs/architecture.png)
 
-Response on /subscriptions is in swagger specified format [Subscription]
+## Response format
+
+Response on `/subscriptions` is in format `[Subscription]`
 
 Other responses return JSON in the format:
 
@@ -43,7 +46,7 @@ Other responses return JSON in the format:
 
 ## How to run
 
-Create .env file (use .env.example as an example)
+Create `.env` file (use `.env.example` as an example)
 
 ```bash
 docker compose up --build
