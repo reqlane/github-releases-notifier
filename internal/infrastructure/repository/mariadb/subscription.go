@@ -3,7 +3,7 @@ package mariadb
 import (
 	"github.com/reqlane/github-releases-notifier/internal/apperror"
 	"github.com/reqlane/github-releases-notifier/internal/contract"
-	"github.com/reqlane/github-releases-notifier/internal/entity"
+	"github.com/reqlane/github-releases-notifier/internal/infrastructure/repository/entity"
 	"github.com/reqlane/github-releases-notifier/internal/model"
 	"gorm.io/gorm"
 )
